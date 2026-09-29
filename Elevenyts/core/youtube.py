@@ -20,6 +20,7 @@ import yt_dlp
 import random
 import asyncio
 import aiohttp
+import shutil
 
 from dataclasses import replace
 from pathlib import Path
@@ -33,6 +34,7 @@ from Elevenyts.helpers import Track, utils
 
 
 class YouTube:
+
     def __init__(self):
         """Initialize YouTube handler with configuration and caching."""
 
@@ -73,6 +75,22 @@ class YouTube:
         self._download_semaphore = asyncio.Semaphore(5)
 
         self._max_video_height = config.VIDEO_MAX_HEIGHT
+
+        # ======================================================
+        # DENO / YT-DLP JAVASCRIPT RUNTIME
+        # ======================================================
+
+        self.deno_path = self._find_deno()
+
+        if self.deno_path:
+            logger.info(
+                f"🦕 Deno runtime detected: {self.deno_path}"
+            )
+        else:
+            logger.warning(
+                "⚠️ Deno runtime was not found. "
+                "YouTube extraction may fail."
+            )
 
         # ======================================================
         # LOGGING
@@ -116,6 +134,145 @@ class YouTube:
         )
 
         logger.info("=" * 50)
+
+    # ==========================================================
+    # DENO DETECTION
+    # ==========================================================
+
+    def _find_deno(self) -> Optional[str]:
+
+        """
+        Find Deno executable for yt-dlp JavaScript challenge solving.
+
+        Priority:
+        1. DENO_PATH environment variable
+        2. PATH
+        3. Common Windows WinGet installation
+        """
+
+        # ------------------------------------------------------
+        # Environment variable
+        # ------------------------------------------------------
+
+        env_path = os.getenv("DENO_PATH")
+
+        if env_path:
+
+            env_path = os.path.expandvars(
+                os.path.expanduser(env_path)
+            )
+
+            if os.path.isfile(env_path):
+
+                return env_path
+
+        # ------------------------------------------------------
+        # PATH
+        # ------------------------------------------------------
+
+        path = shutil.which("deno")
+
+        if path:
+
+            return path
+
+        # ------------------------------------------------------
+        # Windows WinGet fallback
+        # ------------------------------------------------------
+
+        if os.name == "nt":
+
+            local_app_data = os.getenv(
+                "LOCALAPPDATA"
+            )
+
+            if local_app_data:
+
+                winget_dir = os.path.join(
+                    local_app_data,
+                    "Microsoft",
+                    "WinGet",
+                    "Packages"
+                )
+
+                pattern = os.path.join(
+                    winget_dir,
+                    "DenoLand.Deno_*",
+                    "deno.exe"
+                )
+
+                matches = glob.glob(
+                    pattern
+                )
+
+                if matches:
+
+                    return matches[0]
+
+        return None
+
+    # ==========================================================
+    # YT-DLP OPTIONS
+    # ==========================================================
+
+    def _get_ydl_opts(self) -> dict:
+
+        """
+        Common yt-dlp configuration.
+
+        Direct stream extraction does NOT download media.
+        """
+
+        options = {
+            "quiet": True,
+            "no_warnings": True,
+
+            "noplaylist": True,
+
+            "geo_bypass": True,
+            "nocheckcertificate": True,
+
+            "socket_timeout": 30,
+
+            "retries": 3,
+            "fragment_retries": 3,
+            "extractor_retries": 5,
+
+            "skip_download": True,
+
+            "extractor_args": {
+                "youtube": {
+                    "player_client": [
+                        "android",
+                        "web"
+                    ]
+                }
+            },
+        }
+
+        # ------------------------------------------------------
+        # DENO
+        # ------------------------------------------------------
+
+        if self.deno_path:
+
+            options["js_runtimes"] = {
+                "deno": {
+                    "path": self.deno_path
+                }
+            }
+
+        else:
+
+            # Deno is the default runtime in current yt-dlp.
+            # Keeping this explicit allows yt-dlp to try it.
+            options["js_runtimes"] = {
+                "deno": {
+                    "path": None
+                }
+            }
+
+        return options
 
     # ==========================================================
     # EXISTING DOWNLOAD FILE LOCATOR
@@ -418,35 +575,11 @@ class YouTube:
         # YT-DLP OPTIONS
         # ======================================================
 
-        ydl_opts = {
-            "quiet": True,
-            "no_warnings": True,
+        ydl_opts = self._get_ydl_opts()
 
-            "noplaylist": True,
-
-            "geo_bypass": True,
-            "nocheckcertificate": True,
-
-            "socket_timeout": 30,
-
-            "retries": 3,
-            "fragment_retries": 3,
-            "extractor_retries": 5,
-
-            # VERY IMPORTANT:
-            # We only extract URL.
-            # No download option is enabled here.
-            "skip_download": True,
-
-            "extractor_args": {
-                "youtube": {
-                    "player_client": [
-                        "android",
-                        "web"
-                    ]
-                }
-            },
-        }
+        # ------------------------------------------------------
+        # Cookies
+        # ------------------------------------------------------
 
         if cookie:
 
@@ -594,7 +727,7 @@ class YouTube:
             if stream_url:
 
                 logger.info(
-                    f"✅ Direct stream URL extracted: "
+                    f"Direct stream URL extracted: "
                     f"{video_id}"
                 )
 
@@ -899,6 +1032,26 @@ class YouTube:
                     }
                 },
             }
+
+            # --------------------------------------------------
+            # DENO
+            # --------------------------------------------------
+
+            if self.deno_path:
+
+                base_opts["js_runtimes"] = {
+                    "deno": {
+                        "path": self.deno_path
+                    }
+                }
+
+            else:
+
+                base_opts["js_runtimes"] = {
+                    "deno": {
+                        "path": None
+                    }
+                }
 
             if video:
 
@@ -1226,8 +1379,6 @@ class YouTube:
 
                 is_live=is_live,
 
-                # Important:
-                # No downloaded file.
                 file_path=None,
 
             )
@@ -1367,8 +1518,6 @@ class YouTube:
 
                         view_count="",
 
-                        # Important:
-                        # Playlist also does not download.
                         file_path=None,
 
                     )
@@ -1497,12 +1646,6 @@ class YouTube:
 
 # ==========================================================
 # GLOBAL YOUTUBE HANDLER
-# ==========================================================
-#
-# This is important because other modules use:
-#
-# from Elevenyts.core.youtube import yt
-#
 # ==========================================================
 
 yt = YouTube()
