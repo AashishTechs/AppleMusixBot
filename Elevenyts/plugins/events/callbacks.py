@@ -795,20 +795,53 @@ async def _help(_, query: types.CallbackQuery):
 
     # Main help menu
     if query.data in ("help", "help_main"):
+        markup = buttons.help_markup(query.lang)
+
         try:
             await query.edit_message_caption(
                 caption=query.lang["help"],
-                reply_markup=buttons.help_markup(query.lang),
+                reply_markup=markup,
             )
+            return
         except Exception:
+            pass
+
+        try:
+            await query.edit_message_text(
+                text=query.lang["help"],
+                reply_markup=markup,
+            )
+            return
+        except Exception:
+            pass
+
+        # Category pages are photos, so replace the photo message with
+        # a fresh text help menu when BACK is pressed.
+        try:
+            reply_to = getattr(query.message, "reply_to_message_id", None)
+
+            await app.send_message(
+                chat_id=query.message.chat.id,
+                text=query.lang["help"],
+                reply_markup=markup,
+                reply_to_message_id=reply_to,
+            )
+
             try:
-                await query.edit_message_text(
-                    text=query.lang["help"],
-                    reply_markup=buttons.help_markup(query.lang),
-                )
+                await query.message.delete()
             except Exception:
                 pass
-        return
+
+            return
+        except Exception as e:
+            logger.error(
+                f"Failed to return to help menu: {e}",
+                exc_info=True,
+            )
+            return await query.answer(
+                "❌ Unable to open the help menu.",
+                show_alert=True,
+            )
 
     category = query.data.replace("help_", "", 1)
 
