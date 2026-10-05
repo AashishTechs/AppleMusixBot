@@ -121,7 +121,7 @@ class Thumbnail:
         try:
 
             temp = f"cache/temp_{song.id}.jpg"
-            output = f"cache/{song.id}_apple_v3.png"
+            output = f"cache/{song.id}_full.png"
 
             if os.path.exists(output):
                 return output
@@ -229,12 +229,12 @@ class Thumbnail:
             )
 
             # Full artwork: preserve the complete source image, no crop.
-            art_w, art_h = 390, 295
+            art_size = 295
             art_x, art_y = card_x + 25, card_y + 30
             with Image.open(temp) as art_src:
                 art = ImageOps.pad(
                     art_src.convert("RGBA"),
-                    (art_w, art_h),
+                    (art_size, art_size),
                     method=Image.Resampling.LANCZOS,
                     color=(18, 24, 32, 255),
                     centering=(0.5, 0.5)
@@ -242,13 +242,13 @@ class Thumbnail:
 
             art_mask = Image.new("L", art.size, 0)
             ImageDraw.Draw(art_mask).rounded_rectangle(
-                (0, 0, art_w, art_h),
+                (0, 0, art_size, art_size),
                 radius=24,
                 fill=255
             )
             panel.paste(art, (art_x, art_y), art_mask)
 
-            text_x = art_x + art_w + 28
+            text_x = art_x + art_size + 28
             title = trim_to_width(
                 str(song.title or "Unknown Track"),
                 self.title_font,
