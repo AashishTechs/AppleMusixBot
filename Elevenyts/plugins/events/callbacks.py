@@ -1036,15 +1036,18 @@ async def _help(_, query: types.CallbackQuery):
             "</pre>"
         ),
         "maintenance": (
-            "<b>VIDEOCHATS MODULE</b>\\n\\n"
-            "Voice/video chat and assistant maintenance controls.\\n\\n"
+            "<b>Active Video Chats Module</b>\\n"
+            "Manage active voice and video chats.\\n\\n"
+            "<b>Commands</b>\\n\\n"
             "<pre>"
-            "COMMAND                  DESCRIPTION\\n"
+            "Command                    Description\\n"
             "────────────────────────────────────────\\n"
-            "/maintenance              Toggle maintenance mode.\\n"
-            "/channelplay              Configure channel playback.\\n"
-            "/playmode                 Change group play mode.\\n"
-            "/settings                 Open player settings.\\n"
+            "/activevoice               Show all active voice chats.\\n"
+            "/activevideo               Show all active video chats.\\n"
+            "/vclogger [enable/disable] Enable or disable video\\n"
+            "                           chat logs.\\n"
+            "/autoend [enable/disable]  Automatically end streams\\n"
+            "                           when nobody is listening."
             "</pre>"
         ),
         "queue": (
