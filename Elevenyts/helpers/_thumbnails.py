@@ -149,221 +149,263 @@ class Thumbnail:
     ) -> str:
 
         try:
-
             with Image.open(temp) as temp_img:
-                base = ImageOps.fit(temp_img.convert("RGBA"), size, method=Image.Resampling.LANCZOS)
+                base = ImageOps.fit(
+                    temp_img.convert("RGBA"),
+                    size,
+                    method=Image.Resampling.LANCZOS
+                )
 
             bg = base.filter(ImageFilter.GaussianBlur(28))
+            bg = ImageEnhance.Brightness(bg).enhance(0.22)
+            bg = ImageEnhance.Contrast(bg).enhance(1.25)
 
-            bg = ImageEnhance.Brightness(bg).enhance(0.25)
-
-            bg = ImageEnhance.Contrast(bg).enhance(1.4)
-
-            overlay = Image.new(
-                "RGBA",
-                size,
-                (0, 0, 0, 120)
+            bg = Image.alpha_composite(
+                bg,
+                Image.new("RGBA", size, (5, 12, 20, 150))
             )
-
-            bg = Image.alpha_composite(bg, overlay)
 
             panel = Image.new(
                 "RGBA",
                 (PANEL_W, PANEL_H),
-                (10, 10, 10, 155)
+                (10, 22, 34, 238)
             )
+            panel_draw = ImageDraw.Draw(panel)
 
-            border = Image.new(
-                "RGBA",
-                (PANEL_W, PANEL_H),
-                (0, 0, 0, 0)
-            )
-
-            bd = ImageDraw.Draw(border)
-
-            bd.rounded_rectangle(
+            panel_draw.rounded_rectangle(
                 (0, 0, PANEL_W - 1, PANEL_H - 1),
                 radius=42,
-                outline=(0, 255, 255, 220),
-                width=3
+                fill=(10, 22, 34, 238),
+                outline=(55, 145, 220, 180),
+                width=2
             )
 
-            mask = Image.new(
-                "L",
-                (PANEL_W, PANEL_H),
-                0
+            # Header: Now Playing + YouTube + Apple Musix.
+            panel_draw.text(
+                (35, 22),
+                "♫",
+                fill=(40, 190, 255),
+                font=self.signature_font
+            )
+            panel_draw.text(
+                (78, 18),
+                "Now Playing",
+                fill=(85, 215, 255),
+                font=self.title_font
             )
 
-            ImageDraw.Draw(mask).rounded_rectangle(
-                (0, 0, PANEL_W, PANEL_H),
-                radius=42,
-                fill=255
+            yt_x = PANEL_W - 330
+            panel_draw.rounded_rectangle(
+                (yt_x, 25, yt_x + 70, 68),
+                radius=12,
+                fill=(255, 30, 45)
             )
-
-            panel = Image.alpha_composite(panel, border)
-
-            bg.paste(
-                panel,
-                (PANEL_X, PANEL_Y),
-                mask
+            panel_draw.polygon(
+                [(yt_x + 29, 34), (yt_x + 29, 59), (yt_x + 48, 46.5)],
+                fill="white"
             )
-
-            draw = ImageDraw.Draw(bg)
-
-            draw.text(
-                (45, 22),
-                _decode_f(),
-                fill=(255, 255, 255, 230),
+            panel_draw.text(
+                (yt_x + 92, 24),
+                "Apple Musix <<3",
+                fill=(190, 205, 225),
                 font=self.signature_font
             )
 
-            thumb = ImageOps.pad(
-                base,
-                (THUMB_W, THUMB_H),
-                method=Image.Resampling.LANCZOS,
-                color=(18, 24, 32),
-                centering=(0.5, 0.5),
+            panel_draw.line(
+                (30, 82, PANEL_W - 30, 82),
+                fill=(45, 85, 120),
+                width=2
             )
 
-            tmask = Image.new(
-                "L",
-                thumb.size,
-                0
+            # Main player surface.
+            card_x, card_y = 30, 105
+            card_w, card_h = PANEL_W - 60, 355
+            panel_draw.rounded_rectangle(
+                (card_x, card_y, card_x + card_w, card_y + card_h),
+                radius=30,
+                fill=(12, 30, 47, 245),
+                outline=(38, 83, 115, 190),
+                width=2
             )
 
-            ImageDraw.Draw(tmask).rounded_rectangle(
-                (0, 0, THUMB_W, THUMB_H),
-                radius=28,
+            # Full artwork: preserve the complete source image, no crop.
+            art_size = 295
+            art_x, art_y = card_x + 25, card_y + 30
+            with Image.open(temp) as art_src:
+                art = ImageOps.pad(
+                    art_src.convert("RGBA"),
+                    (art_size, art_size),
+                    method=Image.Resampling.LANCZOS,
+                    color=(18, 24, 32, 255),
+                    centering=(0.5, 0.5)
+                )
+
+            art_mask = Image.new("L", art.size, 0)
+            ImageDraw.Draw(art_mask).rounded_rectangle(
+                (0, 0, art_size, art_size),
+                radius=24,
                 fill=255
             )
+            panel.paste(art, (art_x, art_y), art_mask)
 
-            bg.paste(
-                thumb,
-                (THUMB_X, THUMB_Y),
-                tmask
-            )
-
-            clean_title = re.sub(
-                r"\W+",
-                " ",
-                song.title
-            ).title()
-
-            final_title = trim_to_width(
-                clean_title,
+            text_x = art_x + art_size + 28
+            title = trim_to_width(
+                str(song.title or "Unknown Track"),
                 self.title_font,
-                MAX_TITLE_WIDTH
+                540
+            )
+            artist = trim_to_width(
+                str(song.channel_name or "Apple Musix"),
+                self.regular_font,
+                540
             )
 
-            draw.text(
-                (TITLE_X + 2, TITLE_Y + 2),
-                final_title,
-                fill=(0, 0, 0),
+            panel_draw.text(
+                (text_x, card_y + 38),
+                title,
+                fill=(245, 248, 252),
                 font=self.title_font
             )
-
-            draw.text(
-                (TITLE_X, TITLE_Y),
-                final_title,
-                fill=(255, 255, 255),
-                font=self.title_font
-            )
-
-            meta_text = (
-                f"Now Playing  •  YouTube  •  "
-                f"{song.view_count or 'Unknown Views'}"
-            )
-
-            draw.text(
-                (TITLE_X, META_Y),
-                meta_text,
-                fill=(180, 180, 180),
+            panel_draw.text(
+                (text_x, card_y + 98),
+                artist,
+                fill=(160, 180, 205),
                 font=self.regular_font
             )
 
-            draw.rounded_rectangle(
+            # Progress bar.
+            progress_y = card_y + 150
+            progress_x = text_x
+            progress_w = 515
+            panel_draw.rounded_rectangle(
+                (progress_x, progress_y, progress_x + progress_w, progress_y + 8),
+                radius=6,
+                fill=(70, 90, 112)
+            )
+            progress_len = int(progress_w * 0.22)
+            panel_draw.rounded_rectangle(
+                (progress_x, progress_y, progress_x + progress_len, progress_y + 8),
+                radius=6,
+                fill=(235, 245, 255)
+            )
+            panel_draw.ellipse(
                 (
-                    BAR_X,
-                    BAR_Y - 5,
-                    BAR_X + BAR_TOTAL_LEN,
-                    BAR_Y + 5
+                    progress_x + progress_len - 10,
+                    progress_y - 6,
+                    progress_x + progress_len + 10,
+                    progress_y + 14
                 ),
-                radius=12,
-                fill=(60, 60, 60)
+                fill=(245, 248, 252)
             )
 
-            draw.rounded_rectangle(
-                (
-                    BAR_X,
-                    BAR_Y - 5,
-                    BAR_X + BAR_RED_LEN,
-                    BAR_Y + 5
-                ),
-                radius=12,
-                fill=(0, 255, 255)
-            )
-
-            draw.ellipse(
-                (
-                    BAR_X + BAR_RED_LEN - 12,
-                    BAR_Y - 12,
-                    BAR_X + BAR_RED_LEN + 12,
-                    BAR_Y + 12
-                ),
-                fill=(0, 255, 255)
-            )
-
-            draw.text(
-                (BAR_X, BAR_Y + 18),
-                "00:00",
-                fill="white",
+            panel_draw.text(
+                (progress_x, progress_y + 18),
+                "0:00",
+                fill=(155, 175, 200),
                 font=self.regular_font
             )
-
-            is_live = getattr(song, "is_live", False)
-
-            end_text = "LIVE" if is_live else song.duration
-
-            draw.text(
-                (BAR_X + BAR_TOTAL_LEN - 80, BAR_Y + 18),
+            end_text = "LIVE" if getattr(song, "is_live", False) else str(song.duration or "0:00")
+            end_w = panel_draw.textlength(end_text, font=self.regular_font)
+            panel_draw.text(
+                (progress_x + progress_w - end_w, progress_y + 18),
                 end_text,
-                fill=(0, 255, 255) if is_live else "white",
+                fill=(155, 175, 200),
                 font=self.regular_font
             )
 
-            icons_path = "Elevenyts/helpers/play_icons.png"
+            # Previous / pause / next controls.
+            controls_y = card_y + 238
+            cx = text_x + 255
 
-            if os.path.isfile(icons_path):
+            panel_draw.polygon(
+                [(cx - 135, controls_y + 12), (cx - 105, controls_y - 8), (cx - 105, controls_y + 32)],
+                fill="white"
+            )
+            panel_draw.polygon(
+                [(cx - 108, controls_y + 12), (cx - 78, controls_y - 8), (cx - 78, controls_y + 32)],
+                fill="white"
+            )
 
-                with Image.open(icons_path) as icons_img:
+            panel_draw.rounded_rectangle(
+                (cx - 18, controls_y - 12, cx - 4, controls_y + 36),
+                radius=5,
+                fill="white"
+            )
+            panel_draw.rounded_rectangle(
+                (cx + 8, controls_y - 12, cx + 22, controls_y + 36),
+                radius=5,
+                fill="white"
+            )
 
-                    ic = icons_img.resize(
-                        (ICONS_W, ICONS_H)
-                    ).convert("RGBA")
+            panel_draw.polygon(
+                [(cx + 105, controls_y + 12), (cx + 75, controls_y - 8), (cx + 75, controls_y + 32)],
+                fill="white"
+            )
+            panel_draw.polygon(
+                [(cx + 132, controls_y + 12), (cx + 102, controls_y - 8), (cx + 102, controls_y + 32)],
+                fill="white"
+            )
 
-                    r, g, b, a = ic.split()
+            # Volume bar.
+            vol_y = card_y + 315
+            panel_draw.polygon(
+                [(text_x + 10, vol_y + 8), (text_x + 25, vol_y - 3), (text_x + 25, vol_y + 19), (text_x + 10, vol_y + 8)],
+                fill=(190, 210, 230)
+            )
+            panel_draw.rounded_rectangle(
+                (text_x + 70, vol_y + 5, text_x + 455, vol_y + 11),
+                radius=5,
+                fill=(70, 95, 120)
+            )
+            panel_draw.rounded_rectangle(
+                (text_x + 70, vol_y + 5, text_x + 260, vol_y + 11),
+                radius=5,
+                fill=(175, 205, 230)
+            )
 
-                    cyan_ic = Image.merge(
-                        "RGBA",
-                        (
-                            r.point(lambda _: 0),
-                            g.point(lambda _: 255),
-                            b.point(lambda _: 255),
-                            a
-                        )
-                    )
+            # Signature and track metadata below the player.
+            clean_title = re.sub(r"\s+", " ", str(song.title or "Unknown Track")).strip()
+            clean_title = trim_to_width(clean_title, self.title_font, 850)
 
-                    bg.paste(
-                        cyan_ic,
-                        (ICONS_X, ICONS_Y),
-                        cyan_ic
-                    )
+            meta_y = PANEL_H - 128
+            panel_draw.rounded_rectangle(
+                (35, meta_y, PANEL_W - 35, meta_y + 62),
+                radius=18,
+                fill=(18, 39, 59, 245)
+            )
+            panel_draw.text(
+                (58, meta_y + 12),
+                "♪",
+                fill=(55, 190, 255),
+                font=self.signature_font
+            )
+            panel_draw.text(
+                (100, meta_y + 12),
+                clean_title,
+                fill=(235, 242, 250),
+                font=self.regular_font
+            )
+
+            panel_draw.text(
+                (PANEL_W - 245, meta_y + 12),
+                "YouTube",
+                fill=(190, 205, 225),
+                font=self.regular_font
+            )
+
+            panel_draw.text(
+                (35, PANEL_H - 52),
+                "Apple Musix <<3",
+                fill=(95, 185, 245),
+                font=self.signature_font
+            )
+
+            bg.paste(panel, (PANEL_X, PANEL_Y), panel)
 
             bg.save(output)
 
             try:
                 os.remove(temp)
-
             except OSError:
                 pass
 
