@@ -1,14 +1,14 @@
 # ==========================================================
-# Copyright (c) 2026 ArtistBots
+# Copyright (c) 2026 Apple Music <<3
 # All Rights Reserved.
 #
-# Project      : ArtistBots API Telegram Music Bot
-# Powered By   : Artist
+# Project      : Apple Music Telegram Music Bot
+# Powered By   : Apple Music <<3
 # Type         : API Based Telegram Music Bot
 #
-# Bot          : @ArtistApibot
-# Channel      : https://t.me/artistbots
-# GitHub       : https://github.com/elevenyts
+# Bot          : @AppleMusix_bot
+# Support      : https://t.me/deep_emotions_01
+# GitHub       : https://github.com/AashishTechs/AppleMusixBot
 #
 # Unauthorized copying, modification, or redistribution
 # of this source code without permission is prohibited.
@@ -33,13 +33,13 @@ async def _help(_, m: types.Message):
     try:
         await m.reply_photo(
             photo=config.START_IMG,  # Use same image as start command
-            caption=m.lang["help_menu"],
+            caption=m.lang["help"],
             reply_markup=buttons.help_markup(m.lang),
         )
     except Exception:
         # Fallback to text if photo fails
         await m.reply_text(
-            text=m.lang["help_menu"],
+            text=m.lang["help"],
             reply_markup=buttons.help_markup(m.lang),
         )
 
@@ -79,7 +79,7 @@ async def start(_, message: types.Message):
 
     # Use the Apple Musix welcome panel for both private and group /start.
     # The locale currently provides the welcome text under the "start" key.
-    _text = message.lang["start"]
+    _text = message.lang["start"].format(message.from_user.mention)
 
     key = buttons.start_key(message.lang, private)
     try:
