@@ -21,6 +21,7 @@ from pyrogram.errors import FloodWait, QueryIdInvalid
 
 from Elevenyts import tune, app, config, db, lang, logger, queue, tg, yt
 from Elevenyts.helpers import admin_check, buttons, can_manage_vc
+from Elevenyts.helpers.help_pages import render_help_page
 
 
 def safe_callback(func):
@@ -787,356 +788,96 @@ async def handle_shuffle(
     & ~app.bl_users
 )
 @lang.language()
+@safe_callback
 async def _help(_, query: types.CallbackQuery):
 
     await query.answer()
 
     # Main help menu
-    if query.data == "help":
-
+    if query.data in ("help", "help_main"):
         try:
-
             await query.edit_message_caption(
                 caption=query.lang["help"],
-                reply_markup=buttons.help_markup(
-                    query.lang
-                )
+                reply_markup=buttons.help_markup(query.lang),
             )
-
         except Exception:
-
             try:
-
                 await query.edit_message_text(
                     text=query.lang["help"],
-                    reply_markup=buttons.help_markup(
-                        query.lang
-                    )
+                    reply_markup=buttons.help_markup(query.lang),
                 )
-
             except Exception:
                 pass
-
         return
 
-    category = query.data.replace(
-        "help_",
-        ""
-    )
+    category = query.data.replace("help_", "", 1)
 
-    if category == "main":
-        category = "main"
-
-    if category == "main":
-
-        try:
-
-            await query.edit_message_caption(
-                caption=query.lang["help"],
-                reply_markup=buttons.help_markup(
-                    query.lang
-                )
-            )
-
-        except Exception:
-
-            try:
-
-                await query.edit_message_text(
-                    text=query.lang["help"],
-                    reply_markup=buttons.help_markup(
-                        query.lang
-                    )
-                )
-
-            except Exception:
-                pass
-
-        return
-
-    help_texts = {
-        "admins": (
-            "<b>Admin Commands</b>\\n"
-            "Commands available only to administrators.\\n\\n"
-            "<b>Playback</b>\\n\\n"
-            "<pre>"
-            "Command                 Description\\n"
-            "────────────────────────────────────────\\n"
-            "/pause                  Pause the current playing stream.\\n"
-            "/resume                 Resume the paused stream.\\n"
-            "/skip                   Skip the current stream and play the\\n"
-            "                        next track in queue.\\n"
-            "/end or /stop           Stop playback and clear the queue.\\n"
-            "/queue                  Show the current queue.\\n"
-            "/shuffle                Shuffle the queued tracks.\\n"
-            "/loop [1-10]            Repeat the current track for the\\n"
-            "                        specified number of times.\\n"
-            "/seek [time]            Seek to the given timestamp.\\n"
-            "/seekback [time]        Seek backward to the given\\n"
-            "                        timestamp.\\n"
-            "</pre>\\n\\n"
-            "<b>Notes</b>\\n"
-            "• Prefix commands with c to use them in linked channels.\\n"
-            "• Example: /cpause, /cskip, /cqueue"
-        ),
-        "auth": (
-            "<b>Auth Module</b>\\n"
-            "Manage authorized users who can control the bot without\\n"
-            "being Telegram admins.\\n\\n"
-            "<b>Commands</b>\\n\\n"
-            "<pre>"
-            "Command                 Description\\n"
-            "────────────────────────────────────────\\n"
-            "/auth [username]        Add a user to the bot's authorized\\n"
-            "                        users list.\\n"
-            "/unauth [username]      Remove a user from the authorized\\n"
-            "                        users list.\\n"
-            "/authusers              Show the list of authorized users in\\n"
-            "                        the current group.\\n"
-            "</pre>\\n\\n"
-            "<b>Notes</b>\\n"
-            "• Authorized users can use admin commands without\\n"
-            "  having admin rights in the chat.\\n"
-            "• This feature is available only for group administrators."
-        ),
-        "blchat": (
-            "<b>Blacklist Module</b>\\n"
-            "Manage blacklisted chats and blocked users.\\n\\n"
-            "<b>Blacklist Chats</b>\\n\\n"
-            "<pre>"
-            "Command                  Description\\n"
-            "────────────────────────────────────────\\n"
-            "/blacklistchat [chat_id]  Blacklist a chat from using the\\n"
-            "                         bot.\\n"
-            "/whitelistchat [chat_id]  Remove a chat from the\\n"
-            "                         blacklist.\\n"
-            "/blacklistedchat          Show all blacklisted chats.\\n"
-            "</pre>\\n\\n"
-            "<b>Block Users</b>\\n\\n"
-            "<pre>"
-            "Command                  Description\\n"
-            "────────────────────────────────────────\\n"
-            "/block [username/reply]   Block a user from using the\\n"
-            "                         bot.\\n"
-            "/unblock [username/reply] Unblock a previously\\n"
-            "                         blocked user.\\n"
-            "/blockedusers             Show the list of blocked\\n"
-            "                         users.\\n"
-            "</pre>"
-        ),
-        "broadcast": (
-            "<b>Broadcast Module</b>\\n"
-            "Broadcast messages to chats and users. (Sudo users only)\\n\\n"
-            "<b>Commands</b>\\n\\n"
-            "<pre>"
-            "Command                  Description\\n"
-            "────────────────────────────────────────\\n"
-            "/broadcast [message/reply]  Broadcast a message to\\n"
-            "                           served chats.\\n"
-            "</pre>\\n\\n"
-            "<b>Broadcast Modes</b>\\n\\n"
-            "<pre>"
-            "Mode       Description\\n"
-            "────────────────────────────────────────\\n"
-            "--pin      Pin the broadcasted message in chats.\\n"
-            "--pinloud  Pin the message and notify chat members.\\n"
-            "--user     Broadcast only to users who have started the\\n"
-            "           bot.\\n"
-            "--nobot    Skip broadcasting to bots.\\n"
-            "</pre>\\n\\n"
-            "<b>Example</b>\\n"
-            "<code>/broadcast --user --pin Testing Broadcast</code>"
-        ),
-        "ping": (
-            "<b>Ping Module</b>\\n"
-            "Check the bot's performance and statistics.\\n\\n"
-            "<b>Commands</b>\\n\\n"
-            "<pre>"
-            "Command       Description\\n"
-            "────────────────────────────────────────\\n"
-            "/ping         Show the bot's ping and system statistics.\\n"
-            "/stats        Display global statistics, top tracks, top users,\\n"
-            "              top chats, and more."
-            "</pre>"
-        ),
-        "play": (
-            "<b>Play Module</b>\\n\\n"
-            "Commands for playing music and videos.\\n\\n"
-            "<b>Play Commands</b>\\n\\n"
-            "• c stands for <b>Channel Play</b>.\\n"
-            "• v stands for <b>Video Play</b>.\\n"
-            "• force stands for <b>Force Play</b>.\\n\\n"
-            "<pre>"
-            "Command                 Description\\n"
-            "────────────────────────────────────────\\n"
-            "/play /vplay /cplay     Start streaming the requested\\n"
-            "                        track in the voice/video chat.\\n"
-            "/playforce /vplayforce  Stop the current stream and\\n"
-            "/cplayforce             immediately play the requested\\n"
-            "                        track.\\n"
-            "/channelplay [chat      Connect a channel to a group for\\n"
-            "username/id]            channel play.\\n"
-            "/channelplay disable    Disable channel play for the group.\\n"
-            "/pause /cpause          Pause the current stream.\\n"
-            "/resume /cresume        Resume the paused stream.\\n"
-            "/skip /next /cskip      Skip the current stream and play\\n"
-            "                        the next track in queue.\\n"
-            "/end /stop /cend        Stop playback and clear the queue.\\n"
-            "/queue /cqueue          Show the current queue.\\n"
-            "/shuffle /cshuffle      Shuffle the queued tracks.\\n"
-            "/loop [1-10]            Repeat the current track for the\\n"
-            "                        specified number of times.\\n"
-            "/seek [time]            Seek to the given timestamp.\\n"
-            "/seekback [time]        Seek backward to the given timestamp.\\n"
-            "</pre>\\n\\n"
-            "<b>Notes</b>\\n\\n"
-            "• Prefix commands with <b>c</b> to use them in linked channels.\\n\\n"
-            "• Example: /cpause, /cskip, /cqueue"
-        ),
-        "sudo": (
-            "<b>Sudo Module</b>\\n"
-            "Commands available only to sudo users.\\n\\n"
-            "<b>Sudo Users</b>\\n\\n"
-            "<pre>"
-            "Command                  Description\\n"
-            "────────────────────────────────────────\\n"
-            "/addsudo [username/reply] Add a sudo user.\\n"
-            "/delsudo [username/reply] Remove a sudo user.\\n"
-            "/listsudo                 Show sudo users.\\n"
-            "</pre>\\n\\n"
-            "<b>Global Ban</b>\\n\\n"
-            "<pre>"
-            "Command                  Description\\n"
-            "────────────────────────────────────────\\n"
-            "/gban [username/reply]   Globally ban a user from all\\n"
-            "                         served chats.\\n"
-            "/ungban [username/reply] Remove a global ban.\\n"
-            "/gbannedusers             Show globally banned users."
-            "</pre>\\n\\n"
-            "<b>Blacklist Chats</b>\\n\\n"
-            "<pre>"
-            "Command                  Description\\n"
-            "────────────────────────────────────────\\n"
-            "/blacklistchat [chat_id] Blacklist a chat from using the\\n"
-            "                         bot.\\n"
-            "/whitelistchat [chat_id] Remove a chat from the\\n"
-            "                         blacklist.\\n"
-            "/blacklistedchat         Show all blacklisted chats.\\n"
-            "</pre>\\n\\n"
-            "<b>Block Users</b>\\n\\n"
-            "<pre>"
-            "Command                  Description\\n"
-            "────────────────────────────────────────\\n"
-            "/block [username/reply]  Block a user from using the\\n"
-            "                         bot.\\n"
-            "/unblock [username/reply] Unblock a previously\\n"
-            "                         blocked user.\\n"
-            "/blockedusers            Show the list of blocked\\n"
-            "                         users."
-            "</pre>"
-        ),
-        "maintenance": (
-            "<b>Active Video Chats Module</b>\\n"
-            "Manage active voice and video chats.\\n\\n"
-            "<b>Commands</b>\\n\\n"
-            "<pre>"
-            "Command                    Description\\n"
-            "────────────────────────────────────────\\n"
-            "/activevoice               Show all active voice chats.\\n"
-            "/activevideo               Show all active video chats.\\n"
-            "/vclogger [enable/disable] Enable or disable video\\n"
-            "                           chat logs.\\n"
-            "/autoend [enable/disable]  Automatically end streams\\n"
-            "                           when nobody is listening."
-            "</pre>"
-        ),
-        "queue": (
-            "<b>AUTO PLAY MODULE</b>\\n\\n"
-            "Playback, queue and automatic next-track controls.\\n\\n"
-            "<pre>"
-            "COMMAND                  DESCRIPTION\\n"
-            "────────────────────────────────────────\\n"
-            "/pause / /cpause          Pause the current stream.\\n"
-            "/resume / /cresume        Resume the paused stream.\\n"
-            "/skip / /next             Skip to the next track.\\n"
-            "/end / /stop              Stop playback and clear queue.\\n"
-            "/queue                    Show the current queue.\\n"
-            "/shuffle                  Shuffle queued tracks.\\n"
-            "/loop [1-10]              Repeat the current track.\\n"
-            "/seek [time]              Seek to a timestamp.\\n"
-            "/seekback [time]          Seek backward.\\n"
-            "</pre>"
-        ),
-        "start": (
-            "<b>Start Module</b>\\n"
-            "Basic bot commands.\\n\\n"
-            "<b>Commands</b>\\n\\n"
-            "<pre>"
-            "Command       Description\\n"
-            "────────────────────────────────────────\\n"
-            "/start        Start the music bot.\\n"
-            "/help         Open the help menu.\\n"
-            "/privacy      View the privacy policy.\\n"
-            "/reboot       Reboot the bot for your chat.\\n"
-            "/settings     Open the interactive group settings menu.\\n"
-            "/sudolist     Show the list of bot sudo users."
-            "</pre>"
-        ),
-        "autoplay": (
-            "<b>Auto Play</b>\\n"
-            "Auto Play automatically plays related songs when the\\n"
-            "queue becomes empty.\\n\\n"
-            "<b>Command</b>\\n\\n"
-            "<pre>"
-            "Command       Description\\n"
-            "────────────────────────────────────────\\n"
-            "/autoplay     Open Auto Play settings."
-            "</pre>\\n\\n"
-            "<b>Enable / Disable</b>\\n"
-            "• Use <code>/autoplay</code> and tap the Auto Play button.\\n"
-            "• You can also toggle Auto Play directly from the\\n"
-            "  <b>Stream Controls</b>.\\n"
-            "• The button shows whether Auto Play is <b>Enabled</b> or\\n"
-            "  <b>Disabled</b>.\\n\\n"
-            "<b>How It Works</b>\\n"
-            "• Queued songs are played first.\\n"
-            "• When the queue ends, related songs are picked from\\n"
-            "  YouTube Mix.\\n"
-            "• Auto Play continues until disabled or the stream is\\n"
-            "  stopped."
-        ),
-        "main": query.lang["help"],
+    valid_categories = {
+        "admins",
+        "auth",
+        "blchat",
+        "broadcast",
+        "ping",
+        "play",
+        "sudo",
+        "maintenance",
+        "start",
+        "autoplay",
     }
 
-    help_text = help_texts.get(
-        category,
-        "<b>APPLE MUSIX HELP</b>\\n\\nChoose a category above to view its commands."
-    )
-
-    try:
-
-        await query.edit_message_caption(
-            caption=help_text,
-            reply_markup=buttons.help_markup(
-                query.lang,
-                True
-            )
+    if category not in valid_categories:
+        return await query.answer(
+            "⚠️ Help page not found.",
+            show_alert=True,
         )
 
+    photo = await asyncio.to_thread(render_help_page, category)
+
+    markup = buttons.help_markup(
+        query.lang,
+        True,
+    )
+
+    # Category pages are rendered as real images so Telegram shows
+    # bordered Command | Description tables exactly like the reference.
+    try:
+        await query.edit_message_media(
+            media=types.InputMediaPhoto(
+                media=photo,
+            ),
+            reply_markup=markup,
+        )
+        return
     except Exception:
+        pass
+
+    # If the current help message is text, replace it with the table image.
+    try:
+        reply_to = getattr(query.message, "reply_to_message_id", None)
+
+        sent = await app.send_photo(
+            chat_id=query.message.chat.id,
+            photo=photo,
+            reply_markup=markup,
+            reply_to_message_id=reply_to,
+        )
 
         try:
-
-            await query.edit_message_text(
-                text=help_text,
-                reply_markup=buttons.help_markup(
-                    query.lang,
-                    True
-                )
-            )
-
+            await query.message.delete()
         except Exception:
             pass
+
+        return sent
+
+    except Exception as e:
+        logger.error(
+            f"Failed to show help page {category}: {e}",
+            exc_info=True,
+        )
+        return await query.answer(
+            "❌ Unable to open this help page.",
+            show_alert=True,
+        )
 
 
 @app.on_callback_query(
