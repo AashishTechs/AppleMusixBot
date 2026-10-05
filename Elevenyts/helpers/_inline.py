@@ -1,14 +1,13 @@
 # ==========================================================
-# Copyright (c) 2026 ArtistBots
+# Copyright (c) 2026 Apple Music <<3
 # All Rights Reserved.
 #
-# Project      : ArtistBots API Telegram Music Bot
-# Powered By   : Artist
+# Project      : Apple Music Telegram Music Bot
+# Powered By   : Apple Music <<3
 # Type         : API Based Telegram Music Bot
 #
-# Bot          : @ArtistApibot
-# Channel      : https://t.me/artistbots
-# GitHub       : https://github.com/elevenyts
+# Bot          : @AppleMusix_bot
+# GitHub       : https://github.com/AashishTechs/AppleMusixBot
 #
 # Unauthorized copying, modification, or redistribution
 # of this source code without permission is prohibited.
@@ -54,86 +53,50 @@ class Inline:
         remove: bool = False,
     ) -> types.InlineKeyboardMarkup:
 
-        keyboard = []
-
-        # --------------------------------------------------
-        # MUSIC PROGRESS
-        # --------------------------------------------------
-
-        if status:
-            keyboard.append(
+        if remove:
+            return self.ikm(
                 [
-                    self.ikb(
-                        text=f"🎶  {status}",
-                        callback_data=f"controls status {chat_id}",
-                    )
+                    [
+                        self.ikb(
+                            text="✕ CLOSE",
+                            callback_data=f"controls close {chat_id}",
+                            style=ButtonStyle.DANGER,
+                        )
+                    ]
                 ]
             )
 
-        elif timer:
-            keyboard.append(
+        return self.ikm(
+            [
                 [
                     self.ikb(
-                        text=f"🎶  {timer}",
-                        callback_data=f"controls status {chat_id}",
-                    )
-                ]
-            )
-
-        if not remove:
-
-            # --------------------------------------------------
-            # MAIN PLAYER CONTROL ROW
-            # --------------------------------------------------
-
-            keyboard.append(
-                [
-                    self.ikb(
-                        text="⏪ 10",
-                        callback_data=f"controls seek_back_10 {chat_id}",
+                        text="▷",
+                        callback_data=f"controls resume {chat_id}",
+                        style=ButtonStyle.SUCCESS,
                     ),
                     self.ikb(
-                        text="⏸",
+                        text="Ⅱ",
                         callback_data=f"controls pause {chat_id}",
+                        style=ButtonStyle.PRIMARY,
                     ),
                     self.ikb(
-                        text="⏩ 10",
+                        text="↻",
+                        callback_data=f"controls loop {chat_id}",
+                        style=ButtonStyle.PRIMARY,
+                    ),
+                    self.ikb(
+                        text="▶|",
                         callback_data=f"controls skip {chat_id}",
-                    ),
-                ]
-            )
-
-            # --------------------------------------------------
-            # CLICK ME / SUPPORT
-            # --------------------------------------------------
-
-            keyboard.append(
-                [
-                    self.ikb(
-                        text="✨ CLICK ME ↗",
-                        url=config.SUPPORT_CHANNEL,
+                        style=ButtonStyle.PRIMARY,
                     ),
                     self.ikb(
-                        text="💬 SUPPORT ↗",
-                        url=config.SUPPORT_CHAT,
+                        text="□",
+                        callback_data=f"controls stop {chat_id}",
+                        style=ButtonStyle.DANGER,
                     ),
                 ]
-            )
-
-            # --------------------------------------------------
-            # CLOSE PLAYER
-            # --------------------------------------------------
-
-            keyboard.append(
-                [
-                    self.ikb(
-                        text="✕ CLOSE",
-                        callback_data=f"controls close {chat_id}",
-                    )
-                ]
-            )
-
-        return self.ikm(keyboard)
+            ]
+        )
 
     # ======================================================
     # HELP MENU
@@ -409,7 +372,7 @@ class Inline:
                 ),
                 self.ikb(
                     text="ꜱᴏᴜʀᴄᴇ",
-                    url="https://github.com/kalyan631/BlackMusic",
+                    url="https://github.com/AashishTechs/AppleMusixBot",
                     style=ButtonStyle.SUCCESS,
                 ),
             ],
