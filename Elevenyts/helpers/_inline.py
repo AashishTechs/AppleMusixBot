@@ -85,7 +85,7 @@ class Inline:
                         style=ButtonStyle.PRIMARY,
                     ),
                     self.ikb(
-                        text="▶|",
+                        text="▶︎|",
                         callback_data=f"controls skip {chat_id}",
                         style=ButtonStyle.PRIMARY,
                     ),
@@ -271,7 +271,7 @@ class Inline:
                         style=ButtonStyle.PRIMARY,
                     ),
                     self.ikb(
-                        text="▶|",
+                        text="▶︎|",
                         callback_data=f"controls skip {chat_id}",
                         style=ButtonStyle.PRIMARY,
                     ),
