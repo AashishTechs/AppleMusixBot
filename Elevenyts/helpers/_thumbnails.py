@@ -22,7 +22,8 @@ from PIL import (
     ImageDraw,
     ImageEnhance,
     ImageFilter,
-    ImageFont
+    ImageFont,
+    ImageOps
 )
 
 from Elevenyts import config
