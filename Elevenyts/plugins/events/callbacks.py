@@ -948,14 +948,15 @@ async def _help(_, query: types.CallbackQuery):
             "<code>/broadcast --user --pin Testing Broadcast</code>"
         ),
         "ping": (
-            "<b>PING MODULE</b>\\n\\n"
-            "Check bot health and system status.\\n\\n"
+            "<b>Ping Module</b>\\n"
+            "Check the bot's performance and statistics.\\n\\n"
+            "<b>Commands</b>\\n\\n"
             "<pre>"
-            "COMMAND                  DESCRIPTION\\n"
+            "Command       Description\\n"
             "────────────────────────────────────────\\n"
-            "/ping                     Check bot response.\\n"
-            "/alive                    Check bot availability.\\n"
-            "/stats                    Show bot statistics.\\n"
+            "/ping         Show the bot's ping and system statistics.\\n"
+            "/stats        Display global statistics, top tracks, top users,\\n"
+            "              top chats, and more."
             "</pre>"
         ),
         "play": (
