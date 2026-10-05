@@ -54,7 +54,7 @@ ICONS_Y = BAR_Y + 65
 
 MAX_TITLE_WIDTH = 850
 
-_f = "QXJ0aXN0Ym90cw=="
+_f = "QXBwbGUgTXVzaXg="
 
 
 def _decode_f():
@@ -120,7 +120,7 @@ class Thumbnail:
         try:
 
             temp = f"cache/temp_{song.id}.jpg"
-            output = f"cache/{song.id}_ultra.png"
+            output = f"cache/{song.id}_full.png"
 
             if os.path.exists(output):
                 return output
@@ -150,7 +150,7 @@ class Thumbnail:
         try:
 
             with Image.open(temp) as temp_img:
-                base = temp_img.resize(size).convert("RGBA")
+                base = ImageOps.fit(temp_img.convert("RGBA"), size, method=Image.Resampling.LANCZOS)
 
             bg = base.filter(ImageFilter.GaussianBlur(28))
 
@@ -216,7 +216,7 @@ class Thumbnail:
                 font=self.signature_font
             )
 
-            thumb = base.resize((THUMB_W, THUMB_H))
+            thumb = ImageOps.fit(base, (THUMB_W, THUMB_H), method=Image.Resampling.LANCZOS)
 
             tmask = Image.new(
                 "L",
