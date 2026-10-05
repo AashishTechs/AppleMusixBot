@@ -138,7 +138,7 @@ class Inline:
                     self.ikb(text="START", callback_data="start", style=ButtonStyle.SUCCESS),
                 ],
                 [
-                    self.ikb(text="AUTO PLAY", callback_data="help_queue", style=ButtonStyle.PRIMARY),
+                    self.ikb(text="AUTO PLAY", callback_data="help_autoplay", style=ButtonStyle.PRIMARY),
                 ],
                 [
                     self.ikb(text="BACK", callback_data="start", style=ButtonStyle.DANGER),
