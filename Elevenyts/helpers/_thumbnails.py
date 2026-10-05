@@ -327,26 +327,6 @@ class Thumbnail:
                     radius=4,
                     fill=(245, 248, 252)
                 )
-
-                # Small utility icons.
-                uy = 428
-                draw.rounded_rectangle(
-                    (cx - 58, uy, cx - 28, uy + 22),
-                    radius=5,
-                    outline=(205, 216, 228),
-                    width=3
-                )
-                draw.ellipse(
-                    (cx - 48, uy + 7, cx - 43, uy + 12),
-                    fill=(205, 216, 228)
-                )
-                for i in range(3):
-                    draw.line(
-                        (cx + 5 + i * 10, uy + 3, cx + 5 + i * 10, uy + 19),
-                        fill=(205, 216, 228),
-                        width=4
-                    )
-
                 # Signature.
                 draw.text(
                     (28, player_h - 39),
