@@ -348,37 +348,46 @@ class Inline:
         private: bool = False,
     ) -> types.InlineKeyboardMarkup:
 
+        # Apple Musix welcome panel — match the requested layout.
+        # Arrows/icons are intentionally omitted from button labels.
         rows = [
             [
                 self.ikb(
-                    text=lang["add_me"],
+                    text="🚀 CREATE YOUR GROUP",
                     url=f"https://t.me/{app.username}?startgroup=true",
-                    style=ButtonStyle.PRIMARY,
+                    style=ButtonStyle.DANGER,
                 )
             ],
             [
                 self.ikb(
-                    text=lang["help"],
-                    callback_data="help",
+                    text="👤 OWNER",
+                    url="https://t.me/Aashish_0fficial",
                     style=ButtonStyle.SUCCESS,
                 ),
                 self.ikb(
-                    text="ꜱᴏᴜʀᴄᴇ",
-                    url="https://github.com/AashishTechs/AppleMusixBot",
+                    text="🌐 LANGUAGE",
+                    callback_data="language",
                     style=ButtonStyle.SUCCESS,
                 ),
             ],
             [
                 self.ikb(
-                    text=lang["support"],
+                    text="🤝 SUPPORT",
                     url=config.SUPPORT_CHAT,
                     style=ButtonStyle.PRIMARY,
                 ),
                 self.ikb(
-                    text=lang["channel"],
+                    text="📢 UPDATES",
                     url=config.SUPPORT_CHANNEL,
                     style=ButtonStyle.PRIMARY,
                 ),
+            ],
+            [
+                self.ikb(
+                    text="⚙️ HELP AND COMMANDS",
+                    callback_data="help",
+                    style=ButtonStyle.DANGER,
+                )
             ],
         ]
 
