@@ -825,6 +825,9 @@ async def _help(_, query: types.CallbackQuery):
     )
 
     if category == "main":
+        category = "main"
+
+    if category == "main":
 
         try:
 
@@ -852,21 +855,17 @@ async def _help(_, query: types.CallbackQuery):
         return
 
     help_texts = {
-        "admins": query.lang["help_admins"],
-        "auth": query.lang["help_auth"],
-        "broadcast": query.lang["help_sudo"],
-        "blchat": query.lang["help_blchat"],
-        "bluser": query.lang["help_bluser"],
-        "gban": query.lang["help_gban"],
-        "loop": query.lang["help_loop"],
-        "play": query.lang["help_play"],
-        "queue": query.lang["help_queue"],
-        "seek": query.lang["help_seek"],
-        "shuffle": query.lang["help_shuffle"],
-        "ping": query.lang["help_ping"],
-        "stats": query.lang["help_stats"],
-        "sudo": query.lang["help_sudo"],
-        "maintenance": query.lang["help_maintenance"],
+        "admins": "<b>ADMIN</b>\\n\\nAdmin-only controls and group management commands.",
+        "auth": "<b>AUTH</b>\\n\\nAuthorize trusted users to use music controls.",
+        "blchat": "<b>BLACKLIST</b>\\n\\nManage blocked chats and blacklist controls.",
+        "broadcast": "<b>BROADCAST</b>\\n\\nSend announcements to configured chats.",
+        "ping": "<b>PING</b>\\n\\nCheck bot and music engine status.",
+        "play": "<b>PLAY</b>\\n\\nPlay music by song name, search query, or supported link.",
+        "sudo": "<b>SUDO</b>\\n\\nOwner-level commands and privileged controls.",
+        "maintenance": "<b>VIDEOCHATS</b>\\n\\nVoice-chat playback, assistant, and call controls.",
+        "queue": "<b>AUTO PLAY</b>\\n\\nQueue and automatic next-track playback controls.",
+        "start": "<b>START</b>\\n\\nShow the Apple Musix welcome panel.",
+        "main": query.lang["help"],
     }
 
     help_text = help_texts.get(
