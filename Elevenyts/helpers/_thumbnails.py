@@ -149,196 +149,222 @@ class Thumbnail:
     ) -> str:
 
         try:
-            # Compact 16:9 player card, matching the reference-style
-            # Telegram music panel. The artwork and controls are rendered
-            # inside one image; the NOW PLAYING info remains outside this image.
-            panel_w, panel_h = 930, 523
+            # Compact reference-style 16:9 player.
+            player_w, player_h = 930, 523
 
             with Image.open(temp) as src:
                 source = src.convert("RGBA")
 
-                # Soft blurred background behind the player content.
+                # Soft cinematic background.
                 bg = ImageOps.fit(
                     source,
-                    (panel_w, panel_h),
+                    (player_w, player_h),
                     method=Image.Resampling.LANCZOS
                 )
-                bg = bg.filter(ImageFilter.GaussianBlur(24))
-                bg = ImageEnhance.Brightness(bg).enhance(0.28)
-                bg = ImageEnhance.Contrast(bg).enhance(1.10)
-
-                # Dark translucent overlay for a premium player look.
-                overlay = Image.new("RGBA", (panel_w, panel_h), (8, 15, 24, 105))
-                bg = Image.alpha_composite(bg, overlay)
-
-                # Full player surface — no outer padding.
-                player = Image.new(
-                    "RGBA",
-                    (panel_w, panel_h),
-                    (12, 22, 34, 245)
+                bg = bg.filter(ImageFilter.GaussianBlur(26))
+                bg = ImageEnhance.Brightness(bg).enhance(0.30)
+                bg = ImageEnhance.Contrast(bg).enhance(1.12)
+                bg = Image.alpha_composite(
+                    bg,
+                    Image.new("RGBA", (player_w, player_h), (4, 12, 22, 125))
                 )
 
-                # Artwork occupies the left side of the compact 16:9 card.
-                art_w = int(panel_w * 0.48)
-                art_h = panel_h - 34
+                card = Image.new("RGBA", (player_w, player_h), (12, 22, 34, 248))
+                draw = ImageDraw.Draw(card)
+
+                # Artwork: large, clean and gapless inside the player.
+                art_w = 430
+                art_h = 489
                 art = ImageOps.fit(
                     source,
                     (art_w, art_h),
                     method=Image.Resampling.LANCZOS,
                     centering=(0.5, 0.5)
                 )
-
+                art = ImageEnhance.Color(art).enhance(1.08)
                 art_mask = Image.new("L", art.size, 0)
                 ImageDraw.Draw(art_mask).rounded_rectangle(
-                    (0, 0, art.size[0] - 1, art.size[1] - 1),
+                    (0, 0, art_w - 1, art_h - 1),
                     radius=24,
                     fill=255
                 )
-                player.paste(art, (17, 17), art_mask)
+                card.paste(art, (17, 17), art_mask)
 
-                draw = ImageDraw.Draw(player)
+                # Right player section.
+                rx = 482
+                rw = player_w - rx - 30
 
-                # Right-side player controls.
-                info_x = art_w + 42
                 title = trim_to_width(
                     str(song.title or "Unknown Track"),
                     self.title_font,
-                    panel_w - info_x - 35
+                    rw
                 )
                 artist = trim_to_width(
                     str(song.channel_name or "Apple Musix"),
                     self.regular_font,
-                    panel_w - info_x - 35
+                    rw
                 )
 
                 draw.text(
-                    (info_x, 72),
+                    (rx, 62),
                     title,
-                    fill=(245, 248, 252),
+                    fill=(248, 250, 252),
                     font=self.title_font
                 )
                 draw.text(
-                    (info_x, 124),
+                    (rx, 112),
                     artist,
-                    fill=(185, 205, 225),
+                    fill=(190, 208, 225),
                     font=self.regular_font
                 )
 
-                # Progress line.
-                progress_x = info_x
-                progress_w = panel_w - info_x - 38
-                progress_y = 188
+                # Progress bar and timestamps.
+                bar_x = rx
+                bar_w = rw
+                bar_y = 178
+
                 draw.rounded_rectangle(
-                    (progress_x, progress_y, progress_x + progress_w, progress_y + 6),
+                    (bar_x, bar_y, bar_x + bar_w, bar_y + 7),
                     radius=5,
-                    fill=(100, 115, 130)
+                    fill=(92, 108, 124)
                 )
+                played_w = int(bar_w * 0.22)
                 draw.rounded_rectangle(
-                    (progress_x, progress_y, progress_x + int(progress_w * 0.22), progress_y + 6),
+                    (bar_x, bar_y, bar_x + played_w, bar_y + 7),
                     radius=5,
                     fill=(245, 248, 252)
                 )
                 draw.ellipse(
-                    (
-                        progress_x + int(progress_w * 0.22) - 6,
-                        progress_y - 3,
-                        progress_x + int(progress_w * 0.22) + 6,
-                        progress_y + 9
-                    ),
-                    fill=(245, 248, 252)
+                    (bar_x + played_w - 7, bar_y - 4,
+                     bar_x + played_w + 7, bar_y + 10),
+                    fill=(250, 252, 255)
                 )
 
                 draw.text(
-                    (progress_x, 204),
+                    (bar_x, 194),
                     "0:00",
-                    fill=(205, 215, 225),
+                    fill=(205, 216, 228),
                     font=self.regular_font
                 )
 
                 duration = str(getattr(song, "duration", "") or "")
                 duration_text = f"-{duration}" if duration else "-:--"
-                duration_bbox = draw.textbbox((0, 0), duration_text, font=self.regular_font)
+                db = draw.textbbox((0, 0), duration_text, font=self.regular_font)
                 draw.text(
-                    (progress_x + progress_w - (duration_bbox[2] - duration_bbox[0]), 204),
+                    (bar_x + bar_w - (db[2] - db[0]), 194),
                     duration_text,
-                    fill=(205, 215, 225),
+                    fill=(205, 216, 228),
                     font=self.regular_font
                 )
 
-                # Previous / pause / next controls.
-                controls_y = 286
-                center_x = info_x + progress_w // 2
+                # Manual playback icons: avoids broken/boxed Unicode glyphs.
+                cy = 285
+                cx = rx + bar_w // 2
 
-                draw.text(
-                    (center_x - 112, controls_y),
-                    "◀◀",
-                    fill=(248, 250, 252),
-                    font=self.signature_font
+                # Previous: triangle + vertical bar.
+                draw.polygon(
+                    [(cx - 112, cy), (cx - 88, cy - 20), (cx - 88, cy + 20)],
+                    fill=(248, 250, 252)
                 )
-                draw.text(
-                    (center_x - 20, controls_y - 4),
-                    "Ⅱ",
-                    fill=(248, 250, 252),
-                    font=self.title_font
+                draw.polygon(
+                    [(cx - 88, cy), (cx - 64, cy - 20), (cx - 64, cy + 20)],
+                    fill=(248, 250, 252)
                 )
-                draw.text(
-                    (center_x + 70, controls_y),
-                    "▶▶",
-                    fill=(248, 250, 252),
-                    font=self.signature_font
+                draw.rectangle(
+                    (cx - 120, cy - 21, cx - 115, cy + 21),
+                    fill=(248, 250, 252)
                 )
 
-                # Volume line.
-                volume_y = 360
-                draw.text(
-                    (info_x, volume_y - 8),
-                    "⌕",
-                    fill=(220, 230, 240),
-                    font=self.signature_font
+                # Pause.
+                draw.rounded_rectangle(
+                    (cx - 10, cy - 25, cx - 1, cy + 25),
+                    radius=3,
+                    fill=(248, 250, 252)
                 )
                 draw.rounded_rectangle(
-                    (info_x + 35, volume_y, info_x + progress_w, volume_y + 6),
-                    radius=5,
-                    fill=(105, 120, 135)
+                    (cx + 8, cy - 25, cx + 17, cy + 25),
+                    radius=3,
+                    fill=(248, 250, 252)
+                )
+
+                # Next: two triangles + vertical bar.
+                draw.polygon(
+                    [(cx + 64, cy - 20), (cx + 88, cy), (cx + 64, cy + 20)],
+                    fill=(248, 250, 252)
+                )
+                draw.polygon(
+                    [(cx + 88, cy - 20), (cx + 112, cy), (cx + 88, cy + 20)],
+                    fill=(248, 250, 252)
+                )
+                draw.rectangle(
+                    (cx + 116, cy - 21, cx + 121, cy + 21),
+                    fill=(248, 250, 252)
+                )
+
+                # Volume icon + volume bar.
+                vy = 358
+                draw.polygon(
+                    [(rx, vy + 5), (rx + 13, vy + 5), (rx + 28, vy - 10),
+                     (rx + 28, vy + 25), (rx + 13, vy + 10), (rx, vy + 10)],
+                    fill=(225, 235, 244)
+                )
+                draw.arc(
+                    (rx + 18, vy - 4, rx + 50, vy + 22),
+                    start=300,
+                    end=60,
+                    fill=(225, 235, 244),
+                    width=3
+                )
+                vol_x = rx + 58
+                vol_w = bar_w - 58
+                draw.rounded_rectangle(
+                    (vol_x, vy + 7, vol_x + vol_w, vy + 13),
+                    radius=4,
+                    fill=(92, 108, 124)
                 )
                 draw.rounded_rectangle(
-                    (info_x + 35, volume_y, info_x + 35 + int((progress_w - 35) * 0.68), volume_y + 6),
-                    radius=5,
+                    (vol_x, vy + 7, vol_x + int(vol_w * 0.68), vy + 13),
+                    radius=4,
                     fill=(245, 248, 252)
                 )
 
-                # Small Telegram/player-style utility icons.
-                draw.text(
-                    (center_x - 55, 412),
-                    "▢",
-                    fill=(205, 215, 225),
-                    font=self.regular_font
+                # Small utility icons.
+                uy = 428
+                draw.rounded_rectangle(
+                    (cx - 58, uy, cx - 28, uy + 22),
+                    radius=5,
+                    outline=(205, 216, 228),
+                    width=3
                 )
-                draw.text(
-                    (center_x + 10, 412),
-                    "☷",
-                    fill=(205, 215, 225),
-                    font=self.regular_font
+                draw.ellipse(
+                    (cx - 48, uy + 7, cx - 43, uy + 12),
+                    fill=(205, 216, 228)
                 )
+                for i in range(3):
+                    draw.line(
+                        (cx + 5 + i * 10, uy + 3, cx + 5 + i * 10, uy + 19),
+                        fill=(205, 216, 228),
+                        width=4
+                    )
 
-                # Apple Musix signature.
+                # Signature.
                 draw.text(
-                    (28, panel_h - 38),
+                    (28, player_h - 39),
                     "Apple Musix <<3",
-                    fill=(90, 190, 245),
+                    fill=(80, 185, 240),
                     font=self.signature_font
                 )
 
-                # Rounded outer edge, matching the reference card.
-                mask = Image.new("L", player.size, 0)
+                # Rounded outer card.
+                mask = Image.new("L", card.size, 0)
                 ImageDraw.Draw(mask).rounded_rectangle(
-                    (0, 0, panel_w - 1, panel_h - 1),
+                    (0, 0, player_w - 1, player_h - 1),
                     radius=30,
                     fill=255
                 )
 
-                final = Image.new("RGBA", player.size, (8, 15, 24, 255))
-                final.paste(player, (0, 0), mask)
+                final = Image.new("RGBA", (player_w, player_h), (6, 14, 24, 255))
+                final.paste(card, (0, 0), mask)
 
                 final.save(output)
 
@@ -348,6 +374,7 @@ class Thumbnail:
                 pass
 
             return output
+
 
 
         except Exception:
