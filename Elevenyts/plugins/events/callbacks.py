@@ -855,16 +855,135 @@ async def _help(_, query: types.CallbackQuery):
         return
 
     help_texts = {
-        "admins": "<b>ADMIN</b>\\n\\nAdmin-only controls and group management commands.",
-        "auth": "<b>AUTH</b>\\n\\nAuthorize trusted users to use music controls.",
-        "blchat": "<b>BLACKLIST</b>\\n\\nManage blocked chats and blacklist controls.",
-        "broadcast": "<b>BROADCAST</b>\\n\\nSend announcements to configured chats.",
-        "ping": "<b>PING</b>\\n\\nCheck bot and music engine status.",
-        "play": "<b>PLAY</b>\\n\\nPlay music by song name, search query, or supported link.",
-        "sudo": "<b>SUDO</b>\\n\\nOwner-level commands and privileged controls.",
-        "maintenance": "<b>VIDEOCHATS</b>\\n\\nVoice-chat playback, assistant, and call controls.",
-        "queue": "<b>AUTO PLAY</b>\\n\\nQueue and automatic next-track playback controls.",
-        "start": "<b>START</b>\\n\\nShow the Apple Musix welcome panel.",
+        "admins": (
+            "<b>ADMIN MODULE</b>\\n\\n"
+            "Commands for group administration and moderation.\\n\\n"
+            "<pre>"
+            "COMMAND                  DESCRIPTION\\n"
+            "────────────────────────────────────────\\n"
+            "/gban &lt;user&gt;             Globally ban a user.\\n"
+            "/ungban &lt;user&gt;           Remove a global ban.\\n"
+            "/gbanlist                 Show globally banned users.\\n"
+            "/autoleave                Configure automatic assistant leave.\\n"
+            "/maintenance              Toggle maintenance mode.\\n"
+            "/reload                   Reload bot configuration/cache.\\n"
+            "</pre>"
+        ),
+        "auth": (
+            "<b>AUTH MODULE</b>\\n\\n"
+            "Manage authorized users and admin access.\\n\\n"
+            "<pre>"
+            "COMMAND                  DESCRIPTION\\n"
+            "────────────────────────────────────────\\n"
+            "/auth &lt;user&gt;              Authorize a user.\\n"
+            "/unauth &lt;user&gt;            Remove authorization.\\n"
+            "/authlist                 Show authorized users.\\n"
+            "/admincache               Refresh admin cache.\\n"
+            "/reload                   Reload cached permissions.\\n"
+            "</pre>"
+        ),
+        "blchat": (
+            "<b>BLACKLIST MODULE</b>\\n\\n"
+            "Manage blocked chats and blocked users.\\n\\n"
+            "<pre>"
+            "COMMAND                  DESCRIPTION\\n"
+            "────────────────────────────────────────\\n"
+            "/blacklistchat            Blacklist this chat.\\n"
+            "/whitelistchat            Remove chat from blacklist.\\n"
+            "/blacklistedchat          Show blacklisted chats.\\n"
+            "/block &lt;user&gt;             Block a user.\\n"
+            "/unblock &lt;user&gt;           Unblock a user.\\n"
+            "/blockedusers             Show blocked users.\\n"
+            "</pre>"
+        ),
+        "broadcast": (
+            "<b>BROADCAST MODULE</b>\\n\\n"
+            "Send announcements to bot users and chats.\\n\\n"
+            "<pre>"
+            "COMMAND                  DESCRIPTION\\n"
+            "────────────────────────────────────────\\n"
+            "/broadcast &lt;text&gt;         Start a broadcast.\\n"
+            "/stop_broadcast           Stop the active broadcast.\\n"
+            "/stop_gcast               Stop an active global cast.\\n"
+            "</pre>"
+        ),
+        "ping": (
+            "<b>PING MODULE</b>\\n\\n"
+            "Check bot health and system status.\\n\\n"
+            "<pre>"
+            "COMMAND                  DESCRIPTION\\n"
+            "────────────────────────────────────────\\n"
+            "/ping                     Check bot response.\\n"
+            "/alive                    Check bot availability.\\n"
+            "/stats                    Show bot statistics.\\n"
+            "</pre>"
+        ),
+        "play": (
+            "<b>PLAY MODULE</b>\\n\\n"
+            "Commands for playing music and videos.\\n\\n"
+            "<pre>"
+            "COMMAND                  DESCRIPTION\\n"
+            "────────────────────────────────────────\\n"
+            "/play &lt;query&gt;             Play the requested track.\\n"
+            "/vplay &lt;query&gt;            Play video in voice chat.\\n"
+            "/cplay &lt;query&gt;            Play through linked channel.\\n"
+            "/playforce &lt;query&gt;       Force play immediately.\\n"
+            "/vplayforce &lt;query&gt;      Force video playback.\\n"
+            "/cplayforce &lt;query&gt;      Force channel playback.\\n"
+            "</pre>"
+        ),
+        "sudo": (
+            "<b>SUDO MODULE</b>\\n\\n"
+            "Owner-level privileged commands.\\n\\n"
+            "<pre>"
+            "COMMAND                  DESCRIPTION\\n"
+            "────────────────────────────────────────\\n"
+            "/addsudo &lt;user&gt;           Add a sudo user.\\n"
+            "/delsudo &lt;user&gt;          Remove a sudo user.\\n"
+            "/listsudo                 Show sudo users.\\n"
+            "</pre>"
+        ),
+        "maintenance": (
+            "<b>VIDEOCHATS MODULE</b>\\n\\n"
+            "Voice/video chat and assistant maintenance controls.\\n\\n"
+            "<pre>"
+            "COMMAND                  DESCRIPTION\\n"
+            "────────────────────────────────────────\\n"
+            "/maintenance              Toggle maintenance mode.\\n"
+            "/channelplay              Configure channel playback.\\n"
+            "/playmode                 Change group play mode.\\n"
+            "/settings                 Open player settings.\\n"
+            "</pre>"
+        ),
+        "queue": (
+            "<b>AUTO PLAY MODULE</b>\\n\\n"
+            "Playback, queue and automatic next-track controls.\\n\\n"
+            "<pre>"
+            "COMMAND                  DESCRIPTION\\n"
+            "────────────────────────────────────────\\n"
+            "/pause / /cpause          Pause the current stream.\\n"
+            "/resume / /cresume        Resume the paused stream.\\n"
+            "/skip / /next             Skip to the next track.\\n"
+            "/end / /stop              Stop playback and clear queue.\\n"
+            "/queue                    Show the current queue.\\n"
+            "/shuffle                  Shuffle queued tracks.\\n"
+            "/loop [1-10]              Repeat the current track.\\n"
+            "/seek [time]              Seek to a timestamp.\\n"
+            "/seekback [time]          Seek backward.\\n"
+            "</pre>"
+        ),
+        "start": (
+            "<b>START MODULE</b>\\n\\n"
+            "Welcome panel and basic bot entry commands.\\n\\n"
+            "<pre>"
+            "COMMAND                  DESCRIPTION\\n"
+            "────────────────────────────────────────\\n"
+            "/start                    Open the Apple Musix welcome panel.\\n"
+            "/help                     Open Help &amp; Commands.\\n"
+            "/playmode                Configure group play mode.\\n"
+            "/settings                Open player settings.\\n"
+            "</pre>"
+        ),
         "main": query.lang["help"],
     }
 
