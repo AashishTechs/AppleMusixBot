@@ -217,7 +217,13 @@ class Thumbnail:
                 font=self.signature_font
             )
 
-            thumb = ImageOps.pad(\n                base,\n                (THUMB_W, THUMB_H),\n                method=Image.Resampling.LANCZOS,\n                color=(18, 24, 32),\n                centering=(0.5, 0.5),\n            )
+            thumb = ImageOps.pad(
+                base,
+                (THUMB_W, THUMB_H),
+                method=Image.Resampling.LANCZOS,
+                color=(18, 24, 32),
+                centering=(0.5, 0.5),
+            )
 
             tmask = Image.new(
                 "L",
