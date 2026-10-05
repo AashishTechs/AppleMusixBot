@@ -92,10 +92,7 @@ async def _start_callback(_, query: types.CallbackQuery):
 
     await query.answer()
 
-    _text = query.lang["start_pm"].format(
-        query.from_user.first_name,
-        app.name
-    )
+    _text = query.lang["start"].format(query.from_user.mention)
 
     key = buttons.start_key(
         query.lang,
@@ -116,6 +113,14 @@ async def _start_callback(_, query: types.CallbackQuery):
             )
         except Exception:
             pass
+
+
+@app.on_callback_query(filters.regex("^language$") & ~app.bl_users)
+@lang.language()
+@safe_callback
+async def _language(_, query: types.CallbackQuery):
+    """Show the currently available language."""
+    await query.answer("🌐 English is currently enabled.", show_alert=True)
 
 
 @app.on_callback_query(filters.regex("cancel_dl") & ~app.bl_users)
@@ -792,7 +797,7 @@ async def _help(_, query: types.CallbackQuery):
         try:
 
             await query.edit_message_caption(
-                caption=query.lang["help_menu"],
+                caption=query.lang["help"],
                 reply_markup=buttons.help_markup(
                     query.lang
                 )
@@ -803,7 +808,7 @@ async def _help(_, query: types.CallbackQuery):
             try:
 
                 await query.edit_message_text(
-                    text=query.lang["help_menu"],
+                    text=query.lang["help"],
                     reply_markup=buttons.help_markup(
                         query.lang
                     )
