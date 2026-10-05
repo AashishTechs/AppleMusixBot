@@ -877,6 +877,7 @@ async def _help(_, query: types.CallbackQuery):
         await query.edit_message_media(
             media=types.InputMediaPhoto(
                 media=photo,
+                caption="",
             ),
             reply_markup=markup,
         )
