@@ -220,6 +220,7 @@ class Thumbnail:
             # Main player surface.
             card_x, card_y = 30, 105
             card_w, card_h = PANEL_W - 60, 355
+
             panel_draw.rounded_rectangle(
                 (card_x, card_y, card_x + card_w, card_y + card_h),
                 radius=30,
@@ -228,13 +229,11 @@ class Thumbnail:
                 width=2
             )
 
-            # Full artwork: preserve the complete source image, no crop.
-            art_size = 295
-            art_x, art_y = card_x + 25, card_y + 30
+            # Full song artwork: large, complete image with no cropping.
             with Image.open(temp) as art_src:
                 art = ImageOps.pad(
                     art_src.convert("RGBA"),
-                    (art_size, art_size),
+                    (card_w - 10, card_h - 10),
                     method=Image.Resampling.LANCZOS,
                     color=(18, 24, 32, 255),
                     centering=(0.5, 0.5)
@@ -242,127 +241,59 @@ class Thumbnail:
 
             art_mask = Image.new("L", art.size, 0)
             ImageDraw.Draw(art_mask).rounded_rectangle(
-                (0, 0, art_size, art_size),
-                radius=24,
+                (0, 0, art.size[0], art.size[1]),
+                radius=26,
                 fill=255
             )
-            panel.paste(art, (art_x, art_y), art_mask)
+            panel.paste(art, (card_x + 5, card_y + 5), art_mask)
 
-            text_x = art_x + art_size + 28
+            # Subtle bottom gradient so the artwork remains visible while
+            # the player information stays readable.
+            shade = Image.new("RGBA", art.size, (0, 0, 0, 0))
+            shade_draw = ImageDraw.Draw(shade)
+            shade_draw.rectangle(
+                (0, int(art.size[1] * 0.68), art.size[0], art.size[1]),
+                fill=(5, 15, 24, 155)
+            )
+            panel.alpha_composite(shade, (card_x + 5, card_y + 5))
+
+            text_x = card_x + 30
             title = trim_to_width(
                 str(song.title or "Unknown Track"),
                 self.title_font,
-                540
+                card_w - 60
             )
             artist = trim_to_width(
                 str(song.channel_name or "Apple Musix"),
                 self.regular_font,
-                540
+                card_w - 60
             )
 
             panel_draw.text(
-                (text_x, card_y + 38),
+                (text_x, card_y + card_h - 105),
                 title,
                 fill=(245, 248, 252),
                 font=self.title_font
             )
             panel_draw.text(
-                (text_x, card_y + 98),
+                (text_x, card_y + card_h - 70),
                 artist,
-                fill=(160, 180, 205),
+                fill=(185, 205, 225),
                 font=self.regular_font
             )
 
-            # Progress bar.
-            progress_y = card_y + 150
-            progress_x = text_x
-            progress_w = 515
+            progress_y = card_y + card_h - 35
+            progress_w = card_w - 60
             panel_draw.rounded_rectangle(
-                (progress_x, progress_y, progress_x + progress_w, progress_y + 8),
+                (text_x, progress_y, text_x + progress_w, progress_y + 7),
                 radius=6,
-                fill=(70, 90, 112)
+                fill=(90, 110, 130)
             )
-            progress_len = int(progress_w * 0.22)
             panel_draw.rounded_rectangle(
-                (progress_x, progress_y, progress_x + progress_len, progress_y + 8),
+                (text_x, progress_y, text_x + int(progress_w * 0.22), progress_y + 7),
                 radius=6,
-                fill=(235, 245, 255)
-            )
-            panel_draw.ellipse(
-                (
-                    progress_x + progress_len - 10,
-                    progress_y - 6,
-                    progress_x + progress_len + 10,
-                    progress_y + 14
-                ),
                 fill=(245, 248, 252)
             )
-
-            panel_draw.text(
-                (progress_x, progress_y + 18),
-                "0:00",
-                fill=(155, 175, 200),
-                font=self.regular_font
-            )
-            end_text = "LIVE" if getattr(song, "is_live", False) else str(song.duration or "0:00")
-            end_w = panel_draw.textlength(end_text, font=self.regular_font)
-            panel_draw.text(
-                (progress_x + progress_w - end_w, progress_y + 18),
-                end_text,
-                fill=(155, 175, 200),
-                font=self.regular_font
-            )
-
-            # Previous / pause / next controls.
-            controls_y = card_y + 238
-            cx = text_x + 255
-
-            panel_draw.polygon(
-                [(cx - 135, controls_y + 12), (cx - 105, controls_y - 8), (cx - 105, controls_y + 32)],
-                fill="white"
-            )
-            panel_draw.polygon(
-                [(cx - 108, controls_y + 12), (cx - 78, controls_y - 8), (cx - 78, controls_y + 32)],
-                fill="white"
-            )
-
-            panel_draw.rounded_rectangle(
-                (cx - 18, controls_y - 12, cx - 4, controls_y + 36),
-                radius=5,
-                fill="white"
-            )
-            panel_draw.rounded_rectangle(
-                (cx + 8, controls_y - 12, cx + 22, controls_y + 36),
-                radius=5,
-                fill="white"
-            )
-
-            panel_draw.polygon(
-                [(cx + 105, controls_y + 12), (cx + 75, controls_y - 8), (cx + 75, controls_y + 32)],
-                fill="white"
-            )
-            panel_draw.polygon(
-                [(cx + 132, controls_y + 12), (cx + 102, controls_y - 8), (cx + 102, controls_y + 32)],
-                fill="white"
-            )
-
-            # Volume bar.
-            vol_y = card_y + 315
-            panel_draw.polygon(
-                [(text_x + 10, vol_y + 8), (text_x + 25, vol_y - 3), (text_x + 25, vol_y + 19), (text_x + 10, vol_y + 8)],
-                fill=(190, 210, 230)
-            )
-            panel_draw.rounded_rectangle(
-                (text_x + 70, vol_y + 5, text_x + 455, vol_y + 11),
-                radius=5,
-                fill=(70, 95, 120)
-            )
-            panel_draw.rounded_rectangle(
-                (text_x + 70, vol_y + 5, text_x + 260, vol_y + 11),
-                radius=5,
-                fill=(175, 205, 230)
-            )
-
             # Signature and track metadata below the player.
             clean_title = re.sub(r"\s+", " ", str(song.title or "Unknown Track")).strip()
             clean_title = trim_to_width(clean_title, self.title_font, 850)
