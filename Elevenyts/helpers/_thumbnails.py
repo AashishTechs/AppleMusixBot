@@ -229,23 +229,23 @@ class Thumbnail:
                 width=2
             )
 
-            # Full song artwork: large, complete image with no cropping.
+            # Full-bleed song artwork: no gap around the image.
+            # Fit fills the entire player surface, so there is no padding.
             with Image.open(temp) as art_src:
-                art = ImageOps.pad(
+                art = ImageOps.fit(
                     art_src.convert("RGBA"),
-                    (card_w - 10, card_h - 10),
+                    (card_w, card_h),
                     method=Image.Resampling.LANCZOS,
-                    color=(18, 24, 32, 255),
                     centering=(0.5, 0.5)
                 )
 
             art_mask = Image.new("L", art.size, 0)
             ImageDraw.Draw(art_mask).rounded_rectangle(
-                (0, 0, art.size[0], art.size[1]),
-                radius=26,
+                (0, 0, art.size[0] - 1, art.size[1] - 1),
+                radius=30,
                 fill=255
             )
-            panel.paste(art, (card_x + 5, card_y + 5), art_mask)
+            panel.paste(art, (card_x, card_y), art_mask)
 
             # Subtle bottom gradient so the artwork remains visible while
             # the player information stays readable.
