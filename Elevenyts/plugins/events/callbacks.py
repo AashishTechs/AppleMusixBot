@@ -1068,15 +1068,18 @@ async def _help(_, query: types.CallbackQuery):
             "</pre>"
         ),
         "start": (
-            "<b>START MODULE</b>\\n\\n"
-            "Welcome panel and basic bot entry commands.\\n\\n"
+            "<b>Start Module</b>\\n"
+            "Basic bot commands.\\n\\n"
+            "<b>Commands</b>\\n\\n"
             "<pre>"
-            "COMMAND                  DESCRIPTION\\n"
+            "Command       Description\\n"
             "────────────────────────────────────────\\n"
-            "/start                    Open the Apple Musix welcome panel.\\n"
-            "/help                     Open Help &amp; Commands.\\n"
-            "/playmode                Configure group play mode.\\n"
-            "/settings                Open player settings.\\n"
+            "/start        Start the music bot.\\n"
+            "/help         Open the help menu.\\n"
+            "/privacy      View the privacy policy.\\n"
+            "/reboot       Reboot the bot for your chat.\\n"
+            "/settings     Open the interactive group settings menu.\\n"
+            "/sudolist     Show the list of bot sudo users."
             "</pre>"
         ),
         "main": query.lang["help"],
