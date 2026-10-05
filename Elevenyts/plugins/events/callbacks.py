@@ -1082,6 +1082,29 @@ async def _help(_, query: types.CallbackQuery):
             "/sudolist     Show the list of bot sudo users."
             "</pre>"
         ),
+        "autoplay": (
+            "<b>Auto Play</b>\\n"
+            "Auto Play automatically plays related songs when the\\n"
+            "queue becomes empty.\\n\\n"
+            "<b>Command</b>\\n\\n"
+            "<pre>"
+            "Command       Description\\n"
+            "────────────────────────────────────────\\n"
+            "/autoplay     Open Auto Play settings."
+            "</pre>\\n\\n"
+            "<b>Enable / Disable</b>\\n"
+            "• Use <code>/autoplay</code> and tap the Auto Play button.\\n"
+            "• You can also toggle Auto Play directly from the\\n"
+            "  <b>Stream Controls</b>.\\n"
+            "• The button shows whether Auto Play is <b>Enabled</b> or\\n"
+            "  <b>Disabled</b>.\\n\\n"
+            "<b>How It Works</b>\\n"
+            "• Queued songs are played first.\\n"
+            "• When the queue ends, related songs are picked from\\n"
+            "  YouTube Mix.\\n"
+            "• Auto Play continues until disabled or the stream is\\n"
+            "  stopped."
+        ),
         "main": query.lang["help"],
     }
 
