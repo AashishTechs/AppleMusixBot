@@ -149,191 +149,198 @@ class Thumbnail:
     ) -> str:
 
         try:
-            with Image.open(temp) as temp_img:
-                base = ImageOps.fit(
-                    temp_img.convert("RGBA"),
-                    size,
+            # Compact 16:9 player card, matching the reference-style
+            # Telegram music panel. The artwork and controls are rendered
+            # inside one image; the NOW PLAYING info remains outside this image.
+            panel_w, panel_h = 930, 523
+
+            with Image.open(temp) as src:
+                source = src.convert("RGBA")
+
+                # Soft blurred background behind the player content.
+                bg = ImageOps.fit(
+                    source,
+                    (panel_w, panel_h),
                     method=Image.Resampling.LANCZOS
                 )
+                bg = bg.filter(ImageFilter.GaussianBlur(24))
+                bg = ImageEnhance.Brightness(bg).enhance(0.28)
+                bg = ImageEnhance.Contrast(bg).enhance(1.10)
 
-            bg = base.filter(ImageFilter.GaussianBlur(28))
-            bg = ImageEnhance.Brightness(bg).enhance(0.22)
-            bg = ImageEnhance.Contrast(bg).enhance(1.25)
+                # Dark translucent overlay for a premium player look.
+                overlay = Image.new("RGBA", (panel_w, panel_h), (8, 15, 24, 105))
+                bg = Image.alpha_composite(bg, overlay)
 
-            bg = Image.alpha_composite(
-                bg,
-                Image.new("RGBA", size, (5, 12, 20, 150))
-            )
+                # Full player surface — no outer padding.
+                player = Image.new(
+                    "RGBA",
+                    (panel_w, panel_h),
+                    (12, 22, 34, 245)
+                )
 
-            panel = Image.new(
-                "RGBA",
-                (PANEL_W, PANEL_H),
-                (10, 22, 34, 238)
-            )
-            panel_draw = ImageDraw.Draw(panel)
-
-            panel_draw.rounded_rectangle(
-                (0, 0, PANEL_W - 1, PANEL_H - 1),
-                radius=42,
-                fill=(10, 22, 34, 238),
-                outline=(55, 145, 220, 180),
-                width=2
-            )
-
-            # Header: Now Playing + YouTube + Apple Musix.
-            panel_draw.text(
-                (35, 22),
-                "♫",
-                fill=(40, 190, 255),
-                font=self.signature_font
-            )
-            panel_draw.text(
-                (78, 18),
-                "Now Playing",
-                fill=(85, 215, 255),
-                font=self.title_font
-            )
-
-            yt_x = PANEL_W - 330
-            panel_draw.rounded_rectangle(
-                (yt_x, 25, yt_x + 70, 68),
-                radius=12,
-                fill=(255, 30, 45)
-            )
-            panel_draw.polygon(
-                [(yt_x + 29, 34), (yt_x + 29, 59), (yt_x + 48, 46.5)],
-                fill="white"
-            )
-            panel_draw.text(
-                (yt_x + 92, 24),
-                "Apple Musix <<3",
-                fill=(190, 205, 225),
-                font=self.signature_font
-            )
-
-            panel_draw.line(
-                (30, 82, PANEL_W - 30, 82),
-                fill=(45, 85, 120),
-                width=2
-            )
-
-            # Main player surface.
-            card_x, card_y = 30, 105
-            card_w, card_h = PANEL_W - 60, 355
-
-            panel_draw.rounded_rectangle(
-                (card_x, card_y, card_x + card_w, card_y + card_h),
-                radius=30,
-                fill=(12, 30, 47, 245),
-                outline=(38, 83, 115, 190),
-                width=2
-            )
-
-            # Full-bleed song artwork: no gap around the image.
-            # Fit fills the entire player surface, so there is no padding.
-            with Image.open(temp) as art_src:
+                # Artwork occupies the left side of the compact 16:9 card.
+                art_w = int(panel_w * 0.48)
+                art_h = panel_h - 34
                 art = ImageOps.fit(
-                    art_src.convert("RGBA"),
-                    (card_w, card_h),
+                    source,
+                    (art_w, art_h),
                     method=Image.Resampling.LANCZOS,
                     centering=(0.5, 0.5)
                 )
 
-            art_mask = Image.new("L", art.size, 0)
-            ImageDraw.Draw(art_mask).rounded_rectangle(
-                (0, 0, art.size[0] - 1, art.size[1] - 1),
-                radius=30,
-                fill=255
-            )
-            panel.paste(art, (card_x, card_y), art_mask)
+                art_mask = Image.new("L", art.size, 0)
+                ImageDraw.Draw(art_mask).rounded_rectangle(
+                    (0, 0, art.size[0] - 1, art.size[1] - 1),
+                    radius=24,
+                    fill=255
+                )
+                player.paste(art, (17, 17), art_mask)
 
-            # Subtle bottom gradient so the artwork remains visible while
-            # the player information stays readable.
-            shade = Image.new("RGBA", art.size, (0, 0, 0, 0))
-            shade_draw = ImageDraw.Draw(shade)
-            shade_draw.rectangle(
-                (0, int(art.size[1] * 0.68), art.size[0], art.size[1]),
-                fill=(5, 15, 24, 155)
-            )
-            panel.alpha_composite(shade, (card_x + 5, card_y + 5))
+                draw = ImageDraw.Draw(player)
 
-            text_x = card_x + 30
-            title = trim_to_width(
-                str(song.title or "Unknown Track"),
-                self.title_font,
-                card_w - 60
-            )
-            artist = trim_to_width(
-                str(song.channel_name or "Apple Musix"),
-                self.regular_font,
-                card_w - 60
-            )
+                # Right-side player controls.
+                info_x = art_w + 42
+                title = trim_to_width(
+                    str(song.title or "Unknown Track"),
+                    self.title_font,
+                    panel_w - info_x - 35
+                )
+                artist = trim_to_width(
+                    str(song.channel_name or "Apple Musix"),
+                    self.regular_font,
+                    panel_w - info_x - 35
+                )
 
-            panel_draw.text(
-                (text_x, card_y + card_h - 105),
-                title,
-                fill=(245, 248, 252),
-                font=self.title_font
-            )
-            panel_draw.text(
-                (text_x, card_y + card_h - 70),
-                artist,
-                fill=(185, 205, 225),
-                font=self.regular_font
-            )
+                draw.text(
+                    (info_x, 72),
+                    title,
+                    fill=(245, 248, 252),
+                    font=self.title_font
+                )
+                draw.text(
+                    (info_x, 124),
+                    artist,
+                    fill=(185, 205, 225),
+                    font=self.regular_font
+                )
 
-            progress_y = card_y + card_h - 35
-            progress_w = card_w - 60
-            panel_draw.rounded_rectangle(
-                (text_x, progress_y, text_x + progress_w, progress_y + 7),
-                radius=6,
-                fill=(90, 110, 130)
-            )
-            panel_draw.rounded_rectangle(
-                (text_x, progress_y, text_x + int(progress_w * 0.22), progress_y + 7),
-                radius=6,
-                fill=(245, 248, 252)
-            )
-            # Signature and track metadata below the player.
-            clean_title = re.sub(r"\s+", " ", str(song.title or "Unknown Track")).strip()
-            clean_title = trim_to_width(clean_title, self.title_font, 850)
+                # Progress line.
+                progress_x = info_x
+                progress_w = panel_w - info_x - 38
+                progress_y = 188
+                draw.rounded_rectangle(
+                    (progress_x, progress_y, progress_x + progress_w, progress_y + 6),
+                    radius=5,
+                    fill=(100, 115, 130)
+                )
+                draw.rounded_rectangle(
+                    (progress_x, progress_y, progress_x + int(progress_w * 0.22), progress_y + 6),
+                    radius=5,
+                    fill=(245, 248, 252)
+                )
+                draw.ellipse(
+                    (
+                        progress_x + int(progress_w * 0.22) - 6,
+                        progress_y - 3,
+                        progress_x + int(progress_w * 0.22) + 6,
+                        progress_y + 9
+                    ),
+                    fill=(245, 248, 252)
+                )
 
-            meta_y = PANEL_H - 128
-            panel_draw.rounded_rectangle(
-                (35, meta_y, PANEL_W - 35, meta_y + 62),
-                radius=18,
-                fill=(18, 39, 59, 245)
-            )
-            panel_draw.text(
-                (58, meta_y + 12),
-                "♪",
-                fill=(55, 190, 255),
-                font=self.signature_font
-            )
-            panel_draw.text(
-                (100, meta_y + 12),
-                clean_title,
-                fill=(235, 242, 250),
-                font=self.regular_font
-            )
+                draw.text(
+                    (progress_x, 204),
+                    "0:00",
+                    fill=(205, 215, 225),
+                    font=self.regular_font
+                )
 
-            panel_draw.text(
-                (PANEL_W - 245, meta_y + 12),
-                "YouTube",
-                fill=(190, 205, 225),
-                font=self.regular_font
-            )
+                duration = str(getattr(song, "duration", "") or "")
+                duration_text = f"-{duration}" if duration else "-:--"
+                duration_bbox = draw.textbbox((0, 0), duration_text, font=self.regular_font)
+                draw.text(
+                    (progress_x + progress_w - (duration_bbox[2] - duration_bbox[0]), 204),
+                    duration_text,
+                    fill=(205, 215, 225),
+                    font=self.regular_font
+                )
 
-            panel_draw.text(
-                (35, PANEL_H - 52),
-                "Apple Musix <<3",
-                fill=(95, 185, 245),
-                font=self.signature_font
-            )
+                # Previous / pause / next controls.
+                controls_y = 286
+                center_x = info_x + progress_w // 2
 
-            bg.paste(panel, (PANEL_X, PANEL_Y), panel)
+                draw.text(
+                    (center_x - 112, controls_y),
+                    "◀◀",
+                    fill=(248, 250, 252),
+                    font=self.signature_font
+                )
+                draw.text(
+                    (center_x - 20, controls_y - 4),
+                    "Ⅱ",
+                    fill=(248, 250, 252),
+                    font=self.title_font
+                )
+                draw.text(
+                    (center_x + 70, controls_y),
+                    "▶▶",
+                    fill=(248, 250, 252),
+                    font=self.signature_font
+                )
 
-            bg.save(output)
+                # Volume line.
+                volume_y = 360
+                draw.text(
+                    (info_x, volume_y - 8),
+                    "⌕",
+                    fill=(220, 230, 240),
+                    font=self.signature_font
+                )
+                draw.rounded_rectangle(
+                    (info_x + 35, volume_y, info_x + progress_w, volume_y + 6),
+                    radius=5,
+                    fill=(105, 120, 135)
+                )
+                draw.rounded_rectangle(
+                    (info_x + 35, volume_y, info_x + 35 + int((progress_w - 35) * 0.68), volume_y + 6),
+                    radius=5,
+                    fill=(245, 248, 252)
+                )
+
+                # Small Telegram/player-style utility icons.
+                draw.text(
+                    (center_x - 55, 412),
+                    "▢",
+                    fill=(205, 215, 225),
+                    font=self.regular_font
+                )
+                draw.text(
+                    (center_x + 10, 412),
+                    "☷",
+                    fill=(205, 215, 225),
+                    font=self.regular_font
+                )
+
+                # Apple Musix signature.
+                draw.text(
+                    (28, panel_h - 38),
+                    "Apple Musix <<3",
+                    fill=(90, 190, 245),
+                    font=self.signature_font
+                )
+
+                # Rounded outer edge, matching the reference card.
+                mask = Image.new("L", player.size, 0)
+                ImageDraw.Draw(mask).rounded_rectangle(
+                    (0, 0, panel_w - 1, panel_h - 1),
+                    radius=30,
+                    fill=255
+                )
+
+                final = Image.new("RGBA", player.size, (8, 15, 24, 255))
+                final.paste(player, (0, 0), mask)
+
+                final.save(output)
 
             try:
                 os.remove(temp)
@@ -341,6 +348,7 @@ class Thumbnail:
                 pass
 
             return output
+
 
         except Exception:
             return config.DEFAULT_THUMB
