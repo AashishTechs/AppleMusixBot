@@ -832,7 +832,7 @@ async def _help(_, query: types.CallbackQuery):
         try:
 
             await query.edit_message_caption(
-                caption=query.lang["help_menu"],
+                caption=query.lang["help"],
                 reply_markup=buttons.help_markup(
                     query.lang
                 )
@@ -843,7 +843,7 @@ async def _help(_, query: types.CallbackQuery):
             try:
 
                 await query.edit_message_text(
-                    text=query.lang["help_menu"],
+                    text=query.lang["help"],
                     reply_markup=buttons.help_markup(
                         query.lang
                     )
@@ -870,7 +870,7 @@ async def _help(_, query: types.CallbackQuery):
 
     help_text = help_texts.get(
         category,
-        query.lang["help_admins"]
+        "<b>APPLE MUSIX HELP</b>\\n\\nChoose a category above to view its commands."
     )
 
     try:
