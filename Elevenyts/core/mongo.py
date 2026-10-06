@@ -262,18 +262,28 @@ class MongoDB:
         return chat_id in self.chats
 
     async def add_chat(self, chat_id: int) -> None:
-        if not await self.is_chat(chat_id):
+        """Register a group for broadcasts without duplicate-key/cache failures."""
+        if chat_id not in self.chats:
             self.chats.append(chat_id)
-            await self.chatsdb.insert_one({"_id": chat_id})
+        # upsert makes registration safe even when the in-memory cache was
+        # started before MongoDB was loaded or another handler registered it.
+        await self.chatsdb.update_one(
+            {"_id": chat_id},
+            {"$set": {"_id": chat_id}},
+            upsert=True,
+        )
 
     async def rm_chat(self, chat_id: int) -> None:
-        if await self.is_chat(chat_id):
+        """Remove a group from both the memory cache and MongoDB."""
+        if chat_id in self.chats:
             self.chats.remove(chat_id)
-            await self.chatsdb.delete_one({"_id": chat_id})
+        await self.chatsdb.delete_one({"_id": chat_id})
 
     async def get_chats(self) -> list:
-        if not self.chats:
-            self.chats.extend([chat["_id"] async for chat in self.chatsdb.find()])
+        # Always reconcile from MongoDB so broadcasts never use a stale
+        # in-memory recipient list.
+        db_chats = [chat["_id"] async for chat in self.chatsdb.find()]
+        self.chats[:] = db_chats
         return self.chats
 
     # LANGUAGE METHODS
