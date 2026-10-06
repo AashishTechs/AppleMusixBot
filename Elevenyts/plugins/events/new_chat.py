@@ -15,7 +15,7 @@
 from pyrogram import filters, types
 from pyrogram.errors import ChatAdminRequired, ChannelPrivate
 
-from Elevenyts import app, config
+from Elevenyts import app, config, db
 
 
 # ==========================================
@@ -30,6 +30,11 @@ async def new_chat_member(_, message: types.Message):
 
             chat_name = chat.title
             chat_id = chat.id
+
+            # Register every group where the bot is added so owner broadcasts
+            # from private chat can reach it without manual registration.
+            await db.add_chat(chat_id)
+
             chat_username = (
                 f"@{chat.username}"
                 if chat.username
@@ -113,6 +118,10 @@ async def left_chat_member(_, message: types.Message):
 
         chat_name = chat.title
         chat_id = chat.id
+
+        # Remove the group from the broadcast registry immediately.
+        await db.rm_chat(chat_id)
+
         chat_username = (
             f"@{chat.username}"
             if chat.username
@@ -241,3 +250,18 @@ async def get_group_link(_, message: types.Message):
         await message.reply_text(
             f"❌ Error:\n{e}"
         )
+
+# ==========================================
+# 🟢 AUTOMATIC GROUP REGISTRATION
+# ==========================================
+@app.on_message(filters.group)
+async def register_group_for_broadcast(_, message: types.Message):
+    """
+    Keep the broadcast registry synchronized with groups where the bot
+    receives messages. This also backfills groups that were added before
+    the automatic registration system was enabled.
+    """
+    try:
+        await db.add_chat(message.chat.id)
+    except Exception:
+        pass
