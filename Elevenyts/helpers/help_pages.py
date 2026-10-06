@@ -56,46 +56,19 @@ PAGES = {
         "desc": "Commands available only to administrators.",
         "sections": [
             {
-                "title": "Play Mode",
-                "table": (
-                    ["Command", "Description"],
-                    [
-                        ["/playmode", "Open Play Mode settings and choose whether playback is available to everyone or administrators only."],
-                        ["/settings", "Open the group settings panel and manage the current Play Mode."],
-                    ],
-                ),
-            },
-            {
-                "title": "Play Commands",
-                "table": (
-                    ["Command", "Description"],
-                    [
-                        ["/play <query>", "Play a song or YouTube search result in the voice chat."],
-                        ["/playforce <query>", "Force-play the requested track immediately."],
-                        ["/vplay <query>", "Play a video in the video chat."],
-                        ["/vplayforce <query>", "Force-play the requested video immediately."],
-                        ["/cplay <query>", "Play music using the linked channel."],
-                        ["/cplayforce <query>", "Force-play music using the linked channel."],
-                        ["/cvplay <query>", "Play a video using the linked channel."],
-                        ["/cvplayforce <query>", "Force-play a video using the linked channel."],
-                        ["/channelplay [linked|id|disable]", "Enable, configure, or disable channel play for the group."],
-                    ],
-                ),
-            },
-            {
                 "title": "Playback",
                 "table": (
                     ["Command", "Description"],
                     [
-                        ["/pause /cpause", "Pause the current playing stream."],
-                        ["/resume /cresume", "Resume the paused stream."],
-                        ["/skip /next /cskip /cnext", "Skip the current stream and play the next track in queue."],
-                        ["/end /stop /cend /cstop", "Stop playback and clear the queue."],
-                        ["/queue /playing /cqueue /cplaying", "Show the current queue."],
-                        ["/shuffle /cshuffle", "Shuffle the queued tracks."],
-                        ["/loop [mode] /cloop [mode]", "Cycle or set the loop mode for the current playback."],
-                        ["/seek [seconds] /cseek [seconds]", "Seek forward to the requested number of seconds."],
-                        ["/seekback [seconds] /cseekback [seconds]", "Seek backward to the requested number of seconds."],
+                        ["/pause", "Pause the current playing stream."],
+                        ["/resume", "Resume the paused stream."],
+                        ["/skip", "Skip the current stream and play the next track in queue."],
+                        ["/end /stop", "Stop playback and clear the queue."],
+                        ["/queue", "Show the current queue."],
+                        ["/shuffle", "Shuffle the queued tracks."],
+                        ["/loop [1-10]", "Repeat the current track for the specified number of times."],
+                        ["/seek [time]", "Seek to the given timestamp."],
+                        ["/seekback [time]", "Seek backward to the given timestamp."],
                     ],
                 ),
             },
