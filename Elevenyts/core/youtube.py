@@ -234,18 +234,19 @@ class YouTube:
 
             # Fast direct-stream profile. The previous retry/timeouts
             # could keep /play blocked for 30-45+ seconds.
-            "socket_timeout": 10,
+            "socket_timeout": 30,
 
-            "retries": 1,
-            "fragment_retries": 1,
-            "extractor_retries": 1,
+            "retries": 3,
+            "fragment_retries": 3,
+            "extractor_retries": 5,
 
             "skip_download": True,
 
             "extractor_args": {
                 "youtube": {
                     "player_client": [
-                        "android"
+                        "android",
+                        "web"
                     ]
                 }
             },
@@ -592,12 +593,10 @@ class YouTube:
 
         if not video:
 
-            # Do not force an audio-only format here. Some YouTube
-            # player clients no longer expose a separate audio format;
-            # forcing bestaudio then causes "Requested format is not
-            # available" even though a playable stream exists.
-            # yt-dlp's default best format is valid for PyTgCalls.
-            ydl_opts.pop("format", None)
+            ydl_opts["format"] = (
+                "bestaudio[acodec!=none]/"
+                "bestaudio/best"
+            )
 
         # ======================================================
         # VIDEO STREAM
