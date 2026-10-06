@@ -20,7 +20,7 @@ from Elevenyts import app, db, lang
 
 #  ============== CHAT BLACKLIST COMMANDS ==============
 
-@app.on_message(filters.command(["blacklistchat"]) & app.sudo_filter)
+@app.on_message(filters.command(["blacklistchat"]) & app.owner_filter)
 @lang.language()
 async def _blacklist_chat(_, m: types.Message):
     """Add chat to blacklist."""
@@ -57,7 +57,7 @@ async def _blacklist_chat(_, m: types.Message):
     )
 
 
-@app.on_message(filters.command(["whitelistchat", "unblacklistchat"]) & app.sudo_filter)
+@app.on_message(filters.command(["whitelistchat", "unblacklistchat"]) & app.owner_filter)
 @lang.language()
 async def _whitelist_chat(_, m: types.Message):
     """Remove chat from blacklist."""
@@ -96,7 +96,7 @@ async def _whitelist_chat(_, m: types.Message):
     )
 
 
-@app.on_message(filters.command(["blacklistedchat", "blchats"]) & app.sudo_filter)
+@app.on_message(filters.command(["blacklistedchat", "blchats"]) & app.owner_filter)
 @lang.language()
 async def _blacklisted_chats(_, m: types.Message):
     """Show all blacklisted chats."""
@@ -131,7 +131,7 @@ async def _blacklisted_chats(_, m: types.Message):
 
 # ============== USER BLACKLIST COMMANDS ==============
 
-@app.on_message(filters.command(["block"]) & app.sudo_filter)
+@app.on_message(filters.command(["block"]) & app.owner_filter)
 @lang.language()
 async def _block_user(_, m: types.Message):
     """Block a user from using the bot."""
@@ -181,7 +181,7 @@ async def _block_user(_, m: types.Message):
     )
 
 
-@app.on_message(filters.command(["unblock"]) & app.sudo_filter)
+@app.on_message(filters.command(["unblock"]) & app.owner_filter)
 @lang.language()
 async def _unblock_user(_, m: types.Message):
     """Unblock a user."""
@@ -227,7 +227,7 @@ async def _unblock_user(_, m: types.Message):
     )
 
 
-@app.on_message(filters.command(["blockedusers", "blusers"]) & app.sudo_filter)
+@app.on_message(filters.command(["blockedusers", "blusers"]) & app.owner_filter)
 @lang.language()
 async def _blocked_users(_, m: types.Message):
     """Show all blocked users."""
