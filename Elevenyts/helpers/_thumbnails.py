@@ -149,7 +149,9 @@ class Thumbnail:
     ) -> str:
 
         try:
-            # Fixed reference-style music card.
+            # Premium reference-style music card.
+            # Keep the existing 930x523 output size; all visual positions
+            # below are scaled to match the supplied reference image.
             player_w, player_h = 930, 523
 
             with Image.open(temp) as src:
@@ -204,31 +206,33 @@ class Thumbnail:
                 )
                 card.paste(art_box, (art_x, art_y), art_mask)
 
-                # Right-side song information — exact reference layout.
-                rx = 450
+                # Right-side song information — scaled to the supplied
+                # reference image.  The artwork block above is intentionally
+                # untouched.
+                rx = 463
                 rw = player_w - rx - 42
 
                 now_font = ImageFont.truetype(
-                    "Elevenyts/helpers/Raleway-Bold.ttf", 24
+                    "Elevenyts/helpers/Raleway-Bold.ttf", 22
                 )
                 title_font = ImageFont.truetype(
-                    "Elevenyts/helpers/Raleway-Bold.ttf", 50
+                    "Elevenyts/helpers/Raleway-Bold.ttf", 38
                 )
                 artist_font = ImageFont.truetype(
-                    "Elevenyts/helpers/Inter-Light.ttf", 30
+                    "Elevenyts/helpers/Inter-Light.ttf", 27
                 )
                 small_font = ImageFont.truetype(
                     "Elevenyts/helpers/Inter-Light.ttf", 22
                 )
 
-                # Reference palette.
                 accent = (48, 211, 154, 255)
                 artist_color = (120, 228, 181, 255)
                 muted = (171, 201, 190, 255)
                 white = (250, 252, 251, 255)
+                dark = (7, 31, 24, 255)
 
                 draw.text(
-                    (rx, 105),
+                    (rx, 109),
                     "NOW PLAYING",
                     fill=accent,
                     font=now_font
@@ -246,14 +250,14 @@ class Thumbnail:
                 )
 
                 draw.text(
-                    (rx, 151),
+                    (rx, 154),
                     title,
                     fill=white,
                     font=title_font
                 )
 
                 draw.text(
-                    (rx, 218),
+                    (rx, 215),
                     artist,
                     fill=artist_color,
                     font=artist_font
@@ -266,75 +270,67 @@ class Thumbnail:
                     else "Duration  •  --:--"
                 )
                 draw.text(
-                    (rx, 270),
+                    (rx, 267),
                     duration_label,
                     fill=muted,
                     font=small_font
                 )
 
-                # Large reference-style Play pill.
+                # Compact reference-style Play pill.
                 pill_x, pill_y = rx, 323
-                pill_w, pill_h = 315, 76
+                pill_w, pill_h = 206, 50
 
                 draw.rounded_rectangle(
                     (pill_x, pill_y, pill_x + pill_w, pill_y + pill_h),
-                    radius=38,
+                    radius=25,
                     fill=accent
                 )
 
                 py = pill_y + pill_h // 2
                 draw.polygon(
                     [
-                        (pill_x + 66, py - 20),
-                        (pill_x + 66, py + 20),
-                        (pill_x + 101, py)
+                        (pill_x + 43, py - 13),
+                        (pill_x + 43, py + 13),
+                        (pill_x + 66, py)
                     ],
-                    fill=(7, 31, 24, 255)
+                    fill=dark
                 )
 
                 draw.text(
-                    (pill_x + 138, pill_y + 14),
+                    (pill_x + 91, pill_y + 7),
                     "Play",
-                    fill=(7, 31, 24, 255),
+                    fill=dark,
                     font=ImageFont.truetype(
-                        "Elevenyts/helpers/Raleway-Bold.ttf", 30
+                        "Elevenyts/helpers/Raleway-Bold.ttf", 25
                     )
                 )
 
                 # Reference music icon in the upper-right corner.
-                mx, my = player_w - 80, 46
+                mx, my = player_w - 92, 58
                 draw.rectangle(
-                    (mx - 2, my + 12, mx + 4, my + 55),
+                    (mx - 2, my + 12, mx + 4, my + 50),
                     fill=accent
                 )
                 draw.rectangle(
-                    (mx + 22, my + 4, mx + 28, my + 47),
+                    (mx + 20, my + 5, mx + 26, my + 43),
                     fill=accent
                 )
                 draw.polygon(
                     [
                         (mx - 2, my + 12),
-                        (mx + 28, my + 4),
-                        (mx + 28, my + 14),
-                        (mx - 2, my + 22)
+                        (mx + 26, my + 5),
+                        (mx + 26, my + 14),
+                        (mx - 2, my + 21)
                     ],
                     fill=accent
                 )
                 draw.ellipse(
-                    (mx - 17, my + 47, mx + 5, my + 63),
+                    (mx - 16, my + 43, mx + 6, my + 59),
                     fill=accent
                 )
                 draw.ellipse(
-                    (mx + 10, my + 39, mx + 32, my + 55),
+                    (mx + 9, my + 36, mx + 31, my + 52),
                     fill=accent
-                )
-
-                # Small Apple Musix signature below the artwork.
-                draw.text(
-                    (art_x + 2, art_y + art_size + 12),
-                    "Apple Musix <<3",
-                    fill=(145, 225, 250, 255),
-                    font=self.signature_font
                 )
 
                 # Rounded outer card.
