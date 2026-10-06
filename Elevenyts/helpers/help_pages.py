@@ -358,6 +358,54 @@ PAGES = {
 }
 
 
+def format_help_page(category):
+    """Build a real Telegram HTML help page (no screenshot/image)."""
+    page = PAGES.get(category, PAGES["start"])
+
+    def esc(value):
+        return (
+            str(value)
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+        )
+
+    lines = [
+        f"<b>{esc(page['title'])}</b>",
+        f"<i>{esc(page.get('desc', ''))}</i>",
+        "",
+    ]
+
+    for item in page.get("bullets", []):
+        lines.append(f"• {esc(item)}")
+    if page.get("bullets"):
+        lines.append("")
+
+    for sec in page.get("sections", []):
+        lines.append(f"<b>{esc(sec['title'])}</b>")
+        headers, rows = sec["table"]
+        lines.append(f"<b>{esc(headers[0])}  |  {esc(headers[1])}</b>")
+        for row in rows:
+            lines.append(f"<code>{esc(row[0])}</code>  —  {esc(row[1])}")
+        lines.append("")
+
+    for title, bullets in page.get("subsections", []):
+        lines.append(f"<b>{esc(title)}</b>")
+        for item in bullets:
+            lines.append(f"• {esc(item)}")
+        lines.append("")
+
+    if page.get("notes"):
+        lines.append("<b>Notes</b>")
+        for item in page["notes"]:
+            lines.append(f"• {esc(item)}")
+
+    if page.get("example"):
+        lines.extend(["", f"<b>Example</b>", f"<code>{esc(page['example'])}</code>"])
+
+    return "\n".join(lines).strip()
+
+
 def _wrap(draw, text, font, width):
     words = str(text).split()
     lines = []
