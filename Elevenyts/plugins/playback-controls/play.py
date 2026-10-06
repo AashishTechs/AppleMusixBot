@@ -524,11 +524,6 @@ async def play_hndlr(
 
     if not file.file_path:
 
-        await safe_edit(
-            sent,
-            "<blockquote>🔗 Preparing direct stream...</blockquote>",
-        )
-
         stream_url = await get_direct_stream(
             file
         )
