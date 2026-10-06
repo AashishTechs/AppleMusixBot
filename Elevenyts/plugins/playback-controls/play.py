@@ -462,18 +462,15 @@ async def play_hndlr(
         return
 
     # ------------------------------------------------------
-    # Logger (non-critical path)
-    #
-    # Do not make VC startup wait for the logging message.
+    # Logger
     # ------------------------------------------------------
 
     if await db.is_logger():
-        asyncio.create_task(
-            utils.play_log(
-                m,
-                file.title,
-                file.duration,
-            )
+
+        await utils.play_log(
+            m,
+            file.title,
+            file.duration,
         )
 
     # ------------------------------------------------------
@@ -579,10 +576,14 @@ async def play_hndlr(
 
     if not file.file_path:
 
-        # Keep the initial searching message on screen while
-        # YouTube prepares the temporary stream URL. Avoid an
-        # extra Telegram edit round-trip on the critical path.
-        stream_url = await get_direct_stream(file)
+        await safe_edit(
+            sent,
+            "<blockquote>🔗 Preparing direct stream...</blockquote>",
+        )
+
+        stream_url = await get_direct_stream(
+            file
+        )
 
         if not stream_url:
 
