@@ -172,23 +172,34 @@ class Thumbnail:
                 card = Image.new("RGBA", (player_w, player_h), (12, 22, 34, 248))
                 draw = ImageDraw.Draw(card)
 
-                # Artwork: large, clean and gapless inside the player.
+                # Artwork: square, clean and fully visible.
+                # Do NOT crop the source thumbnail: YouTube artwork often
+                # contains important title/artist text near the edges.
                 art_w = 430
-                art_h = 489
-                art = ImageOps.fit(
+                art_h = 430
+                art_box = Image.new("RGBA", (art_w, art_h), (12, 22, 34, 255))
+
+                # Preserve the complete artwork with proportional scaling.
+                # This may leave small letterbox areas, but never cuts the
+                # original image.
+                art = ImageOps.contain(
                     source,
                     (art_w, art_h),
-                    method=Image.Resampling.LANCZOS,
-                    centering=(0.5, 0.5)
+                    method=Image.Resampling.LANCZOS
                 )
                 art = ImageEnhance.Color(art).enhance(1.08)
-                art_mask = Image.new("L", art.size, 0)
+
+                art_x = (art_w - art.width) // 2
+                art_y = (art_h - art.height) // 2
+                art_box.alpha_composite(art, (art_x, art_y))
+
+                art_mask = Image.new("L", art_box.size, 0)
                 ImageDraw.Draw(art_mask).rounded_rectangle(
                     (0, 0, art_w - 1, art_h - 1),
                     radius=24,
                     fill=255
                 )
-                card.paste(art, (17, 17), art_mask)
+                card.paste(art_box, (17, 17), art_mask)
 
                 # Right player section.
                 rx = 482
@@ -327,7 +338,7 @@ class Thumbnail:
                     radius=4,
                     fill=(245, 248, 252)
                 )
-                # Signature.
+                # Signature sits below the artwork instead of overlapping it.
                 draw.text(
                     (28, player_h - 39),
                     "Apple Musix <<3",
