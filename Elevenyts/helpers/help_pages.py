@@ -359,7 +359,12 @@ PAGES = {
 
 
 def format_help_page(category):
-    """Build a real Telegram HTML help page (no screenshot/image)."""
+    """Build a real Telegram HTML help page with a text-based two-column table.
+
+    Telegram messages do not support native bordered tables, so the table is
+    rendered with monospace box-drawing characters. This keeps the page as
+    real text (not an image) while closely matching the reference layout.
+    """
     page = PAGES.get(category, PAGES["start"])
 
     def esc(value):
@@ -369,6 +374,64 @@ def format_help_page(category):
             .replace("<", "&lt;")
             .replace(">", "&gt;")
         )
+
+    def cell_lines(value, width):
+        value = str(value)
+        return wrap(
+            value,
+            width=width,
+            break_long_words=True,
+            break_on_hyphens=False,
+        ) or [""]
+
+    def make_table(headers, rows):
+        # Kept narrow enough for Telegram mobile while still looking like
+        # the Command | Description tables in the reference screenshots.
+        cmd_width = 19
+        desc_width = 25
+
+        def border(left, middle, right, fill="─"):
+            return (
+                left
+                + fill * (cmd_width + 2)
+                + middle
+                + fill * (desc_width + 2)
+                + right
+            )
+
+        output = [
+            border("┌", "┬", "┐"),
+        ]
+
+        header_left = cell_lines(headers[0], cmd_width)
+        header_right = cell_lines(headers[1], desc_width)
+        header_height = max(len(header_left), len(header_right))
+        for i in range(header_height):
+            left = header_left[i] if i < len(header_left) else ""
+            right = header_right[i] if i < len(header_right) else ""
+            output.append(
+                f"│ {left.ljust(cmd_width)} │ {right.ljust(desc_width)} │"
+            )
+
+        output.append(border("├", "┼", "┤"))
+
+        for row_index, row in enumerate(rows):
+            left_lines = cell_lines(row[0], cmd_width)
+            right_lines = cell_lines(row[1], desc_width)
+            row_height = max(len(left_lines), len(right_lines))
+
+            for i in range(row_height):
+                left = left_lines[i] if i < len(left_lines) else ""
+                right = right_lines[i] if i < len(right_lines) else ""
+                output.append(
+                    f"│ {left.ljust(cmd_width)} │ {right.ljust(desc_width)} │"
+                )
+
+            if row_index != len(rows) - 1:
+                output.append(border("├", "┼", "┤"))
+
+        output.append(border("└", "┴", "┘"))
+        return "\n".join(output)
 
     lines = [
         f"<b>{esc(page['title'])}</b>",
@@ -384,9 +447,11 @@ def format_help_page(category):
     for sec in page.get("sections", []):
         lines.append(f"<b>{esc(sec['title'])}</b>")
         headers, rows = sec["table"]
-        lines.append(f"<b>{esc(headers[0])}  |  {esc(headers[1])}</b>")
-        for row in rows:
-            lines.append(f"<code>{esc(row[0])}</code>  —  {esc(row[1])}")
+        lines.append(
+            "<pre>"
+            + esc(make_table(headers, rows))
+            + "</pre>"
+        )
         lines.append("")
 
     for title, bullets in page.get("subsections", []):
@@ -401,7 +466,9 @@ def format_help_page(category):
             lines.append(f"• {esc(item)}")
 
     if page.get("example"):
-        lines.extend(["", f"<b>Example</b>", f"<code>{esc(page['example'])}</code>"])
+        lines.extend(
+            ["", "<b>Example</b>", f"<code>{esc(page['example'])}</code>"]
+        )
 
     return "\n".join(lines).strip()
 
