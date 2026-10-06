@@ -281,7 +281,8 @@ async def play_hndlr(
     # ------------------------------------------------------
 
     try:
-        sent = await m.reply_sticker(
+        sent = await app.send_sticker(
+            chat_id=m.chat.id,
             sticker=SEARCHING_STICKER_ID,
         )
 
