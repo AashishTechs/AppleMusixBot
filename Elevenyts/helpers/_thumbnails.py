@@ -156,7 +156,7 @@ class Thumbnail:
                 source = src.convert("RGBA")
 
                 # One fixed background for the entire card.
-                bg_color = (77, 105, 126, 255)
+                bg_color = (7, 31, 24, 255)
                 card = Image.new("RGBA", (player_w, player_h), bg_color)
                 draw = ImageDraw.Draw(card)
 
@@ -204,12 +204,15 @@ class Thumbnail:
                 )
                 card.paste(art_box, (art_x, art_y), art_mask)
 
-                # Right-side song information, matching the reference layout.
+                # Right-side song information — exact reference layout.
                 rx = 450
                 rw = player_w - rx - 42
 
                 now_font = ImageFont.truetype(
                     "Elevenyts/helpers/Raleway-Bold.ttf", 24
+                )
+                title_font = ImageFont.truetype(
+                    "Elevenyts/helpers/Raleway-Bold.ttf", 50
                 )
                 artist_font = ImageFont.truetype(
                     "Elevenyts/helpers/Inter-Light.ttf", 30
@@ -218,16 +221,22 @@ class Thumbnail:
                     "Elevenyts/helpers/Inter-Light.ttf", 22
                 )
 
+                # Reference palette.
+                accent = (48, 211, 154, 255)
+                artist_color = (120, 228, 181, 255)
+                muted = (171, 201, 190, 255)
+                white = (250, 252, 251, 255)
+
                 draw.text(
                     (rx, 105),
                     "NOW PLAYING",
-                    fill=(150, 225, 255),
+                    fill=accent,
                     font=now_font
                 )
 
                 title = trim_to_width(
                     str(song.title or "Unknown Track"),
-                    self.title_font,
+                    title_font,
                     rw
                 )
                 artist = trim_to_width(
@@ -237,81 +246,87 @@ class Thumbnail:
                 )
 
                 draw.text(
-                    (rx, 157),
+                    (rx, 151),
                     title,
-                    fill=(255, 255, 255),
-                    font=self.title_font
+                    fill=white,
+                    font=title_font
                 )
 
                 draw.text(
                     (rx, 218),
                     artist,
-                    fill=(105, 215, 245),
+                    fill=artist_color,
                     font=artist_font
                 )
 
-                # Duration shown as song metadata.
                 duration = str(getattr(song, "duration", "") or "")
-                duration_label = f"Duration  •  {duration}" if duration else "Duration  •  --:--"
+                duration_label = (
+                    f"Duration  •  {duration}"
+                    if duration
+                    else "Duration  •  --:--"
+                )
                 draw.text(
                     (rx, 270),
                     duration_label,
-                    fill=(190, 202, 214),
+                    fill=muted,
                     font=small_font
                 )
 
-                # Reference-style Play pill.
+                # Large reference-style Play pill.
                 pill_x, pill_y = rx, 323
-                pill_w, pill_h = 205, 66
+                pill_w, pill_h = 315, 76
 
                 draw.rounded_rectangle(
                     (pill_x, pill_y, pill_x + pill_w, pill_y + pill_h),
-                    radius=33,
-                    fill=(82, 126, 151, 255)
+                    radius=38,
+                    fill=accent
                 )
 
-                # Play triangle.
                 py = pill_y + pill_h // 2
                 draw.polygon(
                     [
-                        (pill_x + 38, py - 18),
-                        (pill_x + 38, py + 18),
-                        (pill_x + 64, py)
+                        (pill_x + 66, py - 20),
+                        (pill_x + 66, py + 20),
+                        (pill_x + 101, py)
                     ],
-                    fill=(250, 252, 255, 255)
+                    fill=(7, 31, 24, 255)
                 )
 
                 draw.text(
-                    (pill_x + 82, pill_y + 12),
+                    (pill_x + 138, pill_y + 14),
                     "Play",
-                    fill=(255, 255, 255, 255),
+                    fill=(7, 31, 24, 255),
                     font=ImageFont.truetype(
                         "Elevenyts/helpers/Raleway-Bold.ttf", 30
                     )
                 )
 
-                # Music icon in the upper-right corner.
+                # Reference music icon in the upper-right corner.
                 mx, my = player_w - 80, 46
                 draw.rectangle(
                     (mx - 2, my + 12, mx + 4, my + 55),
-                    fill=(248, 250, 252, 255)
+                    fill=accent
                 )
                 draw.rectangle(
                     (mx + 22, my + 4, mx + 28, my + 47),
-                    fill=(248, 250, 252, 255)
+                    fill=accent
                 )
                 draw.polygon(
-                    [(mx - 2, my + 12), (mx + 28, my + 4),
-                     (mx + 28, my + 14), (mx - 2, my + 22)],
-                    fill=(248, 250, 252, 255)
+                    [
+                        (mx - 2, my + 12),
+                        (mx + 28, my + 4),
+                        (mx + 28, my + 14),
+                        (mx - 2, my + 22)
+                    ],
+                    fill=accent
                 )
                 draw.ellipse(
                     (mx - 17, my + 47, mx + 5, my + 63),
-                    fill=(248, 250, 252, 255)
+                    fill=accent
                 )
                 draw.ellipse(
                     (mx + 10, my + 39, mx + 32, my + 55),
-                    fill=(248, 250, 252, 255)
+                    fill=accent
                 )
 
                 # Small Apple Musix signature below the artwork.
