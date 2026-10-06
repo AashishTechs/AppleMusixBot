@@ -1,14 +1,12 @@
 # ==========================================================
-# Copyright (c) 2026 ArtistBots
+# Copyright (c) 2026 Apple Music <<3
 # All Rights Reserved.
 #
-# Project      : ArtistBots API Telegram Music Bot
-# Powered By   : Artist
+# Project      : Apple Music Telegram Music Bot
+# Powered By   : Apple Music <<3
 # Type         : API Based Telegram Music Bot
 #
-# Bot          : @ArtistApibot
-# Channel      : https://t.me/artistbots
-# GitHub       : https://github.com/elevenyts
+# Bot          : @AppleMusix_bot
 #
 # Unauthorized copying, modification, or redistribution
 # of this source code without permission is prohibited.
@@ -25,7 +23,11 @@ from Elevenyts.helpers import can_manage_vc
 logger = logging.getLogger(__name__)
 
 
-@app.on_message(filters.command(["skip", "next", "cskip", "cnext"]) & filters.group & ~app.bl_users)
+@app.on_message(
+    filters.command(["skip", "next", "cskip", "cnext"])
+    & filters.group
+    & ~app.bl_users
+)
 @lang.language()
 @can_manage_vc
 async def _skip(_, m: types.Message):
@@ -33,31 +35,45 @@ async def _skip(_, m: types.Message):
         await m.delete()
     except Exception:
         pass
-    
-    # Check for channel play mode
+
+    # Check for channel play mode.
     is_channel = m.command[0].lower() in ["cskip", "cnext"]
     chat_id = m.chat.id
-    
+
     if is_channel:
         channel_id = await db.get_cmode(m.chat.id)
+
         if channel_id is None:
-            return await m.reply_text("Channel play is not enabled. Use /channelplay to enable.")
+            try:
+                return await m.reply_text(
+                    "Channel play is not enabled. Use /channelplay to enable."
+                )
+            except (ChatSendPlainForbidden, ChatWriteForbidden):
+                return
+
         chat_id = channel_id
-    
+
     if not await db.get_call(chat_id):
         try:
             return await m.reply_text("Nothing is playing.")
         except (ChatSendPlainForbidden, ChatWriteForbidden):
             return
 
-    await tune.play_next(chat_id)
+    # Start switching tracks in the background instead of making the
+    # Telegram command handler wait for YouTube stream extraction.
+    asyncio.create_task(tune.play_next(chat_id))
+
     try:
-        sent_msg = await m.reply_text(f"Skipped by {m.from_user.mention}")
+        sent_msg = await m.reply_text(
+            f"⏭️ Skipped by {m.from_user.mention}"
+        )
     except (ChatSendPlainForbidden, ChatWriteForbidden):
         logger.warning("Cannot send plain text in media-only chat")
         return
-    
-    await asyncio.sleep(5)
+
+    # Keep the confirmation short-lived.
+    await asyncio.sleep(3)
+
     try:
         await sent_msg.delete()
     except Exception:
