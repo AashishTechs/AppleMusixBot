@@ -121,7 +121,7 @@ class Thumbnail:
         try:
 
             temp = f"cache/temp_{song.id}.jpg"
-            output = f"cache/{song.id}_full_v2.png"
+            output = f"cache/{song.id}_full_v3.png"
 
             if os.path.exists(output):
                 return output
@@ -168,17 +168,26 @@ class Thumbnail:
                     width=2
                 )
 
-                # Artwork box: complete source image must fit inside it.
-                # Nothing is cropped from any side.
+                # Artwork: TRUE SQUARE cover.
+                # The player always shows a 1:1 cover area.  The source is
+                # proportionally resized and softly extended to the square
+                # so the cover never becomes a visible 16:9 rectangle.
                 art_size = 360
                 art_x, art_y = 42, 72
 
-                art_box = Image.new(
-                    "RGBA",
+                # Build a square background from the same artwork.
+                square_bg = ImageOps.fit(
+                    source,
                     (art_size, art_size),
-                    (58, 80, 96, 255)
+                    method=Image.Resampling.LANCZOS,
+                    centering=(0.5, 0.5)
                 )
+                square_bg = square_bg.filter(ImageFilter.GaussianBlur(10))
+                square_bg = ImageEnhance.Color(square_bg).enhance(0.9)
+                square_bg = ImageEnhance.Brightness(square_bg).enhance(0.72)
 
+                # Put the complete original artwork over the square canvas.
+                # No stretching: its aspect ratio is preserved.
                 art = ImageOps.contain(
                     source,
                     (art_size, art_size),
@@ -186,6 +195,7 @@ class Thumbnail:
                 )
                 art = ImageEnhance.Color(art).enhance(1.05)
 
+                art_box = square_bg.copy()
                 ax = (art_size - art.width) // 2
                 ay = (art_size - art.height) // 2
                 art_box.alpha_composite(art, (ax, ay))
