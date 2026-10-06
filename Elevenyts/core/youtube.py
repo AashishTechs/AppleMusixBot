@@ -592,10 +592,12 @@ class YouTube:
 
         if not video:
 
-            ydl_opts["format"] = (
-                "bestaudio[acodec!=none]/"
-                "bestaudio/best"
-            )
+            # Do not force an audio-only format here. Some YouTube
+            # player clients no longer expose a separate audio format;
+            # forcing bestaudio then causes "Requested format is not
+            # available" even though a playable stream exists.
+            # yt-dlp's default best format is valid for PyTgCalls.
+            ydl_opts.pop("format", None)
 
         # ======================================================
         # VIDEO STREAM
