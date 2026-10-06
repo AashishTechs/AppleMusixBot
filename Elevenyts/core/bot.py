@@ -53,6 +53,11 @@ class Bot(pyrogram.Client):
         self.logger: int = config.LOGGER_ID
         self.bl_users: pyrogram.filters.Filter = pyrogram.filters.user()
         self.sudoers: set = {self.owner}  # Set of sudo user IDs
+        # Owner-only filter for sensitive global/admin commands.
+        # Sudo users may be managed in the database, but these commands
+        # remain executable only by the configured bot owner.
+        self.owner_filter: pyrogram.filters.Filter = pyrogram.filters.user(
+            self.owner)
         self.sudo_filter: pyrogram.filters.Filter = pyrogram.filters.user(
             self.owner)
 
