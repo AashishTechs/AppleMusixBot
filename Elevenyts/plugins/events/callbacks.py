@@ -21,7 +21,7 @@ from pyrogram.errors import FloodWait, QueryIdInvalid
 
 from Elevenyts import tune, app, config, db, lang, logger, queue, tg, yt
 from Elevenyts.helpers import admin_check, buttons, can_manage_vc
-from Elevenyts.helpers.help_pages import render_help_page
+from Elevenyts.helpers.help_pages import format_help_page
 
 
 def safe_callback(func):
@@ -864,34 +864,29 @@ async def _help(_, query: types.CallbackQuery):
             show_alert=True,
         )
 
-    photo = await asyncio.to_thread(render_help_page, category)
+    text = format_help_page(category)
 
     markup = buttons.help_markup(
         query.lang,
         True,
     )
 
-    # Category pages are rendered as real images so Telegram shows
-    # bordered Command | Description tables exactly like the reference.
+    # Category pages are real Telegram text messages, not generated screenshots.
     try:
-        await query.edit_message_media(
-            media=types.InputMediaPhoto(
-                media=photo,
-                caption="",
-            ),
+        await query.edit_message_text(
+            text=text,
             reply_markup=markup,
         )
         return
     except Exception:
         pass
 
-    # If the current help message is text, replace it with the table image.
     try:
         reply_to = getattr(query.message, "reply_to_message_id", None)
 
-        sent = await app.send_photo(
+        sent = await app.send_message(
             chat_id=query.message.chat.id,
-            photo=photo,
+            text=text,
             reply_markup=markup,
             reply_to_message_id=reply_to,
         )
