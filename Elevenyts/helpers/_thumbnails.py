@@ -158,7 +158,7 @@ class Thumbnail:
                 source = src.convert("RGBA")
 
                 # One fixed background for the entire card.
-                bg_color = (7, 31, 24, 255)
+                bg_color = (16, 56, 42, 255)
                 card = Image.new("RGBA", (player_w, player_h), bg_color)
                 draw = ImageDraw.Draw(card)
 
@@ -229,7 +229,7 @@ class Thumbnail:
                 artist_color = (120, 228, 181, 255)
                 muted = (171, 201, 190, 255)
                 white = (250, 252, 251, 255)
-                dark = (7, 31, 24, 255)
+                dark = (16, 56, 42, 255)
 
                 draw.text(
                     (rx, 102),
