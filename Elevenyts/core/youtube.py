@@ -232,19 +232,20 @@ class YouTube:
             "geo_bypass": True,
             "nocheckcertificate": True,
 
-            "socket_timeout": 30,
+            # Fast direct-stream profile. The previous retry/timeouts
+            # could keep /play blocked for 30-45+ seconds.
+            "socket_timeout": 10,
 
-            "retries": 3,
-            "fragment_retries": 3,
-            "extractor_retries": 5,
+            "retries": 1,
+            "fragment_retries": 1,
+            "extractor_retries": 1,
 
             "skip_download": True,
 
             "extractor_args": {
                 "youtube": {
                     "player_client": [
-                        "android",
-                        "web"
+                        "android"
                     ]
                 }
             },
@@ -715,27 +716,33 @@ class YouTube:
         # RUN EXTRACTION WITHOUT BLOCKING BOT
         # ======================================================
 
+        started_at = time.monotonic()
+
         try:
 
             stream_url = await asyncio.wait_for(
                 asyncio.to_thread(
                     _extract
                 ),
-                timeout=45
+                timeout=12
             )
+
+            elapsed = time.monotonic() - started_at
 
             if stream_url:
 
                 logger.info(
                     f"Direct stream URL extracted: "
-                    f"{video_id}"
+                    f"{video_id} "
+                    f"in {elapsed:.2f}s"
                 )
 
             else:
 
                 logger.error(
                     f"❌ No direct stream URL found: "
-                    f"{video_id}"
+                    f"{video_id} "
+                    f"after {elapsed:.2f}s"
                 )
 
             return stream_url
