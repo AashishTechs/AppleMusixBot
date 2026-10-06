@@ -53,8 +53,33 @@ SMALL = _font(19)
 PAGES = {
     "admins": {
         "title": "Admin Commands",
-        "desc": "Commands available only to administrators.",
+        "desc": "Commands available to group administrators.",
         "sections": [
+            {
+                "title": "Play Mode",
+                "table": (
+                    ["Command", "Description"],
+                    [
+                        ["/playmode", "Open Play Mode settings and choose who can use playback commands."],
+                        ["/settings", "Open the group settings panel, including Play Mode."],
+                    ],
+                ),
+            },
+            {
+                "title": "Play Commands",
+                "table": (
+                    ["Command", "Description"],
+                    [
+                        ["/play <query>", "Play a song or YouTube search result in the voice chat."],
+                        ["/vplay <query>", "Play a video in the video chat."],
+                        ["/cplay <query>", "Play using the linked channel."],
+                        ["/playforce <query>", "Force-play a requested track immediately."],
+                        ["/cplayforce <query>", "Force-play through the linked channel."],
+                        ["/queue", "Show the current queue."],
+                        ["/shuffle", "Shuffle queued tracks."],
+                    ],
+                ),
+            },
             {
                 "title": "Playback",
                 "table": (
@@ -62,20 +87,18 @@ PAGES = {
                     [
                         ["/pause", "Pause the current playing stream."],
                         ["/resume", "Resume the paused stream."],
-                        ["/skip", "Skip the current stream and play the next track in queue."],
-                        ["/end or /stop", "Stop playback and clear the queue."],
-                        ["/queue", "Show the current queue."],
-                        ["/shuffle", "Shuffle the queued tracks."],
-                        ["/loop [1-10]", "Repeat the current track for the specified number of times."],
-                        ["/seek [time]", "Seek to the given timestamp."],
-                        ["/seekback [time]", "Seek backward to the given timestamp."],
+                        ["/skip /next", "Skip the current stream and play the next track."],
+                        ["/end /stop", "Stop playback and clear the queue."],
+                        ["/loop [1-10]", "Repeat the current track for the selected number of times."],
+                        ["/seek [time]", "Seek to the requested timestamp."],
+                        ["/seekback [time]", "Seek backward to the requested timestamp."],
                     ],
                 ),
-            }
+            },
         ],
         "notes": [
-            "Prefix commands with c to use them in linked channels.",
-            "Example: /cpause, /cskip, /cqueue",
+            "Commands follow the group's current Play Mode permission.",
+            "Prefix supported commands with c for linked-channel playback.",
         ],
     },
     "auth": {
