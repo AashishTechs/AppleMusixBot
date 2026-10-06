@@ -11,8 +11,6 @@
 # of this source code without permission is prohibited.
 # ==========================================================
 
-from pathlib import Path
-
 from pyrogram import filters
 from pyrogram import types
 from pyrogram.errors import (
@@ -33,10 +31,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-SEARCHING_IMAGE = (
-    Path(__file__).resolve().parents[2]
-    / "assets"
-    / "searching.png"
+SEARCHING_STICKER_ID = (
+    "CAACAgUAAxkBAAIBjGrFX87LfG9I5TCGqoCYbwMF7kUVAAIyDAACF5QRVfFhjPxpDHe-HgQ"
 )
 
 
@@ -284,23 +280,14 @@ async def play_hndlr(
     # Searching indicator
     # ------------------------------------------------------
 
-    play_emoji = m.lang["play_emoji"]
-
     try:
-        if not SEARCHING_IMAGE.is_file():
-            logger.error(
-                f"Searching image not found: {SEARCHING_IMAGE}"
-            )
-            return
-
-        with SEARCHING_IMAGE.open("rb") as searching_photo:
-            sent = await m.reply_photo(
-                photo=searching_photo,
-            )
+        sent = await m.reply_sticker(
+            sticker=SEARCHING_STICKER_ID,
+        )
 
     except Exception as e:
         logger.exception(
-            f"Failed to send searching image: {e}"
+            f"Failed to send searching sticker: {e}"
         )
         return
 
