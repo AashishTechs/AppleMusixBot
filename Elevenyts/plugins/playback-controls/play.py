@@ -11,6 +11,8 @@
 # of this source code without permission is prohibited.
 # ==========================================================
 
+from pathlib import Path
+
 from pyrogram import filters
 from pyrogram import types
 from pyrogram.errors import (
@@ -31,10 +33,16 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+SEARCHING_IMAGE = (
+    Path(__file__).resolve().parents[2]
+    / "assets"
+    / "searching.png"
+)
+
 
 async def safe_edit(message, text, **kwargs):
     """
-    Safely edit a Telegram message.
+    Safely edit a Telegram text or media message.
     """
 
     try:
@@ -48,14 +56,30 @@ async def safe_edit(message, text, **kwargs):
             await message.edit_text(text, **kwargs)
             return True
         except Exception:
-            return False
+            try:
+                await message.edit_caption(text, **kwargs)
+                return True
+            except Exception:
+                return False
 
     except (MessageIdInvalid, MessageDeleteForbidden):
         return False
 
-    except Exception as e:
-        logger.debug(f"Message edit failed: {e}")
-        return False
+    except Exception:
+        try:
+            await message.edit_caption(text, **kwargs)
+            return True
+        except FloodWait as e:
+            await asyncio.sleep(e.value)
+
+            try:
+                await message.edit_caption(text, **kwargs)
+                return True
+            except Exception:
+                return False
+        except Exception as e:
+            logger.debug(f"Message edit failed: {e}")
+            return False
 
 
 async def safe_reply(message, text, **kwargs):
@@ -155,25 +179,13 @@ async def play_hndlr(
     video: bool = False,
 ) -> None:
 
-    # ------------------------------------------------------
-    # Delete command message
-    # ------------------------------------------------------
-
     try:
         await m.delete()
     except Exception:
         pass
 
-    # ------------------------------------------------------
-    # Chat IDs
-    # ------------------------------------------------------
-
     chat_id = m.chat.id
     message_chat_id = m.chat.id
-
-    # ------------------------------------------------------
-    # Channel play mode
-    # ------------------------------------------------------
 
     if cplay:
 
@@ -203,10 +215,6 @@ async def play_hndlr(
                 "Please make sure I'm admin in the channel "
                 "and channel exists.</blockquote>",
             )
-
-        # --------------------------------------------------
-        # Assistant
-        # --------------------------------------------------
 
         client = await db.get_client(channel_id)
 
@@ -273,27 +281,30 @@ async def play_hndlr(
                 )
 
     # ------------------------------------------------------
-    # Searching message
+    # Searching indicator
     # ------------------------------------------------------
 
     play_emoji = m.lang["play_emoji"]
 
     try:
+        if SEARCHING_IMAGE.exists():
+            sent = await m.reply_photo(
+                photo=str(SEARCHING_IMAGE),
+            )
+        else:
+            sent = await safe_reply(
+                m,
+                m.lang["play_searching"].format(play_emoji),
+            )
 
+    except Exception:
         sent = await safe_reply(
             m,
             m.lang["play_searching"].format(play_emoji),
         )
 
-    except Exception:
-        return
-
     if not sent:
         return
-
-    # ------------------------------------------------------
-    # User / media
-    # ------------------------------------------------------
 
     mention = m.from_user.mention
 
@@ -306,10 +317,6 @@ async def play_hndlr(
     tracks = []
     file = None
 
-    # ------------------------------------------------------
-    # Telegram media
-    # ------------------------------------------------------
-
     if media:
 
         setattr(sent, "lang", m.lang)
@@ -319,15 +326,7 @@ async def play_hndlr(
             sent,
         )
 
-    # ------------------------------------------------------
-    # URL
-    # ------------------------------------------------------
-
     elif url:
-
-        # --------------------------------------------------
-        # Playlist
-        # --------------------------------------------------
 
         if "playlist" in url:
 
@@ -376,10 +375,6 @@ async def play_hndlr(
 
             file.message_id = sent.id
 
-        # --------------------------------------------------
-        # Single URL
-        # --------------------------------------------------
-
         else:
 
             file = await yt.search(
@@ -397,10 +392,6 @@ async def play_hndlr(
             )
 
             return
-
-    # ------------------------------------------------------
-    # Search query
-    # ------------------------------------------------------
 
     elif len(m.command) >= 2:
 
@@ -422,16 +413,8 @@ async def play_hndlr(
 
             return
 
-    # ------------------------------------------------------
-    # No file
-    # ------------------------------------------------------
-
     if not file:
         return
-
-    # ------------------------------------------------------
-    # Video flag
-    # ------------------------------------------------------
 
     file.video = (
         getattr(file, "video", False)
@@ -442,10 +425,6 @@ async def play_hndlr(
 
         for track in tracks:
             track.video = True
-
-    # ------------------------------------------------------
-    # Duration check
-    # ------------------------------------------------------
 
     if (
         not file.is_live
@@ -461,10 +440,6 @@ async def play_hndlr(
 
         return
 
-    # ------------------------------------------------------
-    # Logger
-    # ------------------------------------------------------
-
     if await db.is_logger():
 
         await utils.play_log(
@@ -473,15 +448,7 @@ async def play_hndlr(
             file.duration,
         )
 
-    # ------------------------------------------------------
-    # User
-    # ------------------------------------------------------
-
     file.user = mention
-
-    # ------------------------------------------------------
-    # Add to queue
-    # ------------------------------------------------------
 
     if force:
 
@@ -496,10 +463,6 @@ async def play_hndlr(
             chat_id,
             file,
         )
-
-        # --------------------------------------------------
-        # Call already active
-        # --------------------------------------------------
 
         if await db.get_call(chat_id):
 
@@ -517,10 +480,6 @@ async def play_hndlr(
                     "PLAY",
                 ),
             )
-
-            # ------------------------------------------------
-            # Add playlist tracks
-            # ------------------------------------------------
 
             if tracks:
 
@@ -544,13 +503,6 @@ async def play_hndlr(
                 except Exception:
                     pass
 
-            # ------------------------------------------------
-            # Direct-stream architecture
-            #
-            # No download/preload.
-            # URLs are extracted when playback starts.
-            # ------------------------------------------------
-
             try:
 
                 from Elevenyts import preload
@@ -569,10 +521,6 @@ async def play_hndlr(
                 )
 
             return
-
-    # ------------------------------------------------------
-    # DIRECT STREAM
-    # ------------------------------------------------------
 
     if not file.file_path:
 
@@ -603,10 +551,6 @@ async def play_hndlr(
 
             return
 
-    # ------------------------------------------------------
-    # PLAY
-    # ------------------------------------------------------
-
     try:
 
         await tune.play_media(
@@ -619,10 +563,6 @@ async def play_hndlr(
                 else None
             ),
         )
-
-        # --------------------------------------------------
-        # Reaction
-        # --------------------------------------------------
 
         try:
 
@@ -674,10 +614,6 @@ async def play_hndlr(
             )
 
         return
-
-    # ------------------------------------------------------
-    # Playlist queue
-    # ------------------------------------------------------
 
     if not tracks:
         return
