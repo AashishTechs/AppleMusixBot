@@ -121,7 +121,7 @@ class Thumbnail:
         try:
 
             temp = f"cache/temp_{song.id}.jpg"
-            output = f"cache/{song.id}_full_v5.png"
+            output = f"cache/{song.id}_full_v6.png"
 
             if os.path.exists(output):
                 return output
@@ -170,8 +170,8 @@ class Thumbnail:
                 # The player always shows a 1:1 cover area.  The source is
                 # proportionally resized and softly extended to the square
                 # so the cover never becomes a visible 16:9 rectangle.
-                art_size = 360
-                art_x, art_y = 42, 72
+                art_size = 390
+                art_x, art_y = 36, 66
 
                 # Build a square background from the same artwork.
                 square_bg = ImageOps.fit(
@@ -209,20 +209,20 @@ class Thumbnail:
                 # Right-side song information — scaled to the supplied
                 # reference image.  The artwork block above is intentionally
                 # untouched.
-                rx = 463
+                rx = 480
                 rw = player_w - rx - 42
 
                 now_font = ImageFont.truetype(
-                    "Elevenyts/helpers/Raleway-Bold.ttf", 22
+                    "Elevenyts/helpers/Raleway-Bold.ttf", 24
                 )
                 title_font = ImageFont.truetype(
-                    "Elevenyts/helpers/Raleway-Bold.ttf", 38
+                    "Elevenyts/helpers/Raleway-Bold.ttf", 44
                 )
                 artist_font = ImageFont.truetype(
-                    "Elevenyts/helpers/Inter-Light.ttf", 27
+                    "Elevenyts/helpers/Inter-Light.ttf", 31
                 )
                 small_font = ImageFont.truetype(
-                    "Elevenyts/helpers/Inter-Light.ttf", 22
+                    "Elevenyts/helpers/Inter-Light.ttf", 24
                 )
 
                 accent = (48, 211, 154, 255)
@@ -232,7 +232,7 @@ class Thumbnail:
                 dark = (7, 31, 24, 255)
 
                 draw.text(
-                    (rx, 109),
+                    (rx, 102),
                     "NOW PLAYING",
                     fill=accent,
                     font=now_font
@@ -250,14 +250,14 @@ class Thumbnail:
                 )
 
                 draw.text(
-                    (rx, 154),
+                    (rx, 151),
                     title,
                     fill=white,
                     font=title_font
                 )
 
                 draw.text(
-                    (rx, 215),
+                    (rx, 218),
                     artist,
                     fill=artist_color,
                     font=artist_font
@@ -270,43 +270,43 @@ class Thumbnail:
                     else "Duration  •  --:--"
                 )
                 draw.text(
-                    (rx, 267),
+                    (rx, 273),
                     duration_label,
                     fill=muted,
                     font=small_font
                 )
 
                 # Compact reference-style Play pill.
-                pill_x, pill_y = rx, 323
-                pill_w, pill_h = 206, 50
+                pill_x, pill_y = rx, 331
+                pill_w, pill_h = 230, 58
 
                 draw.rounded_rectangle(
                     (pill_x, pill_y, pill_x + pill_w, pill_y + pill_h),
-                    radius=25,
+                    radius=29,
                     fill=accent
                 )
 
                 py = pill_y + pill_h // 2
                 draw.polygon(
                     [
-                        (pill_x + 43, py - 13),
-                        (pill_x + 43, py + 13),
-                        (pill_x + 66, py)
+                        (pill_x + 48, py - 15),
+                        (pill_x + 48, py + 15),
+                        (pill_x + 75, py)
                     ],
                     fill=dark
                 )
 
                 draw.text(
-                    (pill_x + 91, pill_y + 7),
+                    (pill_x + 103, pill_y + 8),
                     "Play",
                     fill=dark,
                     font=ImageFont.truetype(
-                        "Elevenyts/helpers/Raleway-Bold.ttf", 25
+                        "Elevenyts/helpers/Raleway-Bold.ttf", 28
                     )
                 )
 
                 # Reference music icon in the upper-right corner.
-                mx, my = player_w - 92, 58
+                mx, my = player_w - 88, 52
                 draw.rectangle(
                     (mx - 2, my + 12, mx + 4, my + 50),
                     fill=accent
