@@ -19,7 +19,91 @@ import sys
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-from pyrogram import idle
+from pyrogram import idle, types
+
+# Telegram command menu. Keep this list complete so users can discover every
+# registered command from Telegram's "/" suggestion menu. Permission filters
+# remain in the individual plugins, so showing a command does not grant access.
+BOT_COMMANDS = [
+    types.BotCommand("start", "Start the bot"),
+    types.BotCommand("help", "Open the help menu"),
+    types.BotCommand("privacy", "View privacy policy"),
+    types.BotCommand("play", "Play a song"),
+    types.BotCommand("vplay", "Play a video"),
+    types.BotCommand("cplay", "Play music in a linked channel"),
+    types.BotCommand("playforce", "Force play a song"),
+    types.BotCommand("vplayforce", "Force play a video"),
+    types.BotCommand("cplayforce", "Force play in a linked channel"),
+    types.BotCommand("pause", "Pause playback"),
+    types.BotCommand("cpause", "Pause linked-channel playback"),
+    types.BotCommand("resume", "Resume playback"),
+    types.BotCommand("cresume", "Resume linked-channel playback"),
+    types.BotCommand("skip", "Skip the current track"),
+    types.BotCommand("next", "Play the next track"),
+    types.BotCommand("cskip", "Skip in a linked channel"),
+    types.BotCommand("stop", "Stop playback and clear queue"),
+    types.BotCommand("end", "Stop playback and clear queue"),
+    types.BotCommand("cend", "Stop linked-channel playback"),
+    types.BotCommand("queue", "Show the current queue"),
+    types.BotCommand("cqueue", "Show the linked-channel queue"),
+    types.BotCommand("shuffle", "Shuffle the queue"),
+    types.BotCommand("cshuffle", "Shuffle linked-channel queue"),
+    types.BotCommand("loop", "Loop the current track"),
+    types.BotCommand("seek", "Seek to a timestamp"),
+    types.BotCommand("seekback", "Seek backward"),
+    types.BotCommand("channelplay", "Configure channel play"),
+    types.BotCommand("settings", "Open group settings"),
+    types.BotCommand("autoplay", "Configure Auto Play"),
+    types.BotCommand("ping", "Check bot ping and status"),
+    types.BotCommand("stats", "Show bot statistics"),
+    types.BotCommand("id", "Show Telegram ID"),
+    types.BotCommand("activevoice", "Show active voice chats"),
+    types.BotCommand("activevideo", "Show active video chats"),
+    types.BotCommand("vclogger", "Configure voice-chat logging"),
+    types.BotCommand("autoend", "Configure automatic stream ending"),
+    types.BotCommand("auth", "Authorize a user"),
+    types.BotCommand("unauth", "Remove user authorization"),
+    types.BotCommand("authusers", "Show authorized users"),
+    types.BotCommand("adminmention", "Mention group administrators"),
+    types.BotCommand("bots", "Show bot information"),
+    types.BotCommand("groupdata", "Show group information"),
+    types.BotCommand("blacklistchat", "Blacklist a chat"),
+    types.BotCommand("whitelistchat", "Remove chat from blacklist"),
+    types.BotCommand("blacklistedchat", "Show blacklisted chats"),
+    types.BotCommand("blchats", "Show blacklisted chats"),
+    types.BotCommand("block", "Block a user"),
+    types.BotCommand("unblock", "Unblock a user"),
+    types.BotCommand("blockedusers", "Show blocked users"),
+    types.BotCommand("blusers", "Show blocked users"),
+    types.BotCommand("broadcast", "Broadcast a message"),
+    types.BotCommand("stop_gcast", "Stop an active broadcast"),
+    types.BotCommand("stop_broadcast", "Stop an active broadcast"),
+    types.BotCommand("addsudo", "Add a sudo user"),
+    types.BotCommand("delsudo", "Remove a sudo user"),
+    types.BotCommand("rmsudo", "Remove a sudo user"),
+    types.BotCommand("listsudo", "Show sudo users"),
+    types.BotCommand("sudolist", "Show sudo users"),
+    types.BotCommand("gban", "Globally ban a user"),
+    types.BotCommand("ungban", "Remove a global ban"),
+    types.BotCommand("unglobalban", "Remove a global ban"),
+    types.BotCommand("gbanlist", "Show global bans"),
+    types.BotCommand("gbannedusers", "Show global bans"),
+    types.BotCommand("leave", "Make the bot leave a chat"),
+    types.BotCommand("autoleave", "Configure automatic leaving"),
+    types.BotCommand("maintenance", "Configure maintenance mode"),
+    types.BotCommand("reboot", "Reboot the bot"),
+    types.BotCommand("restart", "Restart the bot"),
+    types.BotCommand("eval", "Run owner maintenance code"),
+]
+
+async def install_bot_commands():
+    """Publish the complete command menu for all Telegram users."""
+    try:
+        await app.set_bot_commands(BOT_COMMANDS)
+        logger.info("⌨️ Telegram command menu installed: %d commands.", len(BOT_COMMANDS))
+    except Exception as e:
+        logger.error("Failed to install Telegram command menu: %s", e, exc_info=True)
+
 
 # Raise the file descriptor limit on Linux to avoid "[Errno 24] Too many open files"
 # when serving many groups concurrently (each audio stream + ffmpeg probe opens FDs).
@@ -95,6 +179,11 @@ async def main():
             except Exception as e:
                 logger.error(f"Failed to load plugin {module}: {e}", exc_info=True)
         logger.info(f"🔌 Loaded {len(all_modules)} plugin modules.")
+
+        # Publish commands after every plugin has been loaded. The menu is
+        # visible to everyone; owner/admin restrictions are still enforced
+        # by the command handlers themselves.
+        await install_bot_commands()
 
         # Step 8: Load sudo users and blacklisted users from database
         sudoers = await db.get_sudoers()
