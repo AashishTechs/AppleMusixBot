@@ -57,10 +57,15 @@ async def start(_, message: types.Message):
     - Adds new users to database
     - Sends log to logger group for new users
     """
-    # Delete /start immediately in every chat so the command never
-    # remains visible while the welcome panel is being prepared.
+    # Keep /start visible while the welcome panel is being prepared.
+    # This makes the command feel like a normal working Telegram command
+    # instead of disappearing before the response suddenly appears.
     try:
-        await message.delete()
+        await app.send_chat_action(
+            message.chat.id,
+            enums.ChatAction.UPLOAD_PHOTO,
+        )
+        await asyncio.sleep(0.4)
     except Exception:
         pass
     
@@ -96,6 +101,13 @@ async def start(_, message: types.Message):
             text=_text,
             reply_markup=key,
         )
+
+    # Remove /start only after the welcome panel is already on screen.
+    # The user therefore sees a clear command -> response flow.
+    try:
+        await message.delete()
+    except Exception:
+        pass
 
     # Do not delay the welcome panel for database/logging work.
     # These operations are intentionally scheduled in the background.
