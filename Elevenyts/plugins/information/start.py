@@ -14,6 +14,8 @@
 # of this source code without permission is prohibited.
 # ==========================================================
 
+import asyncio
+
 from pyrogram import enums, errors, filters, types
 
 from Elevenyts import app, config, db, lang
@@ -55,12 +57,12 @@ async def start(_, message: types.Message):
     - Adds new users to database
     - Sends log to logger group for new users
     """
-    # Auto-delete command message in group chats
-    if message.chat.type != enums.ChatType.PRIVATE:
-        try:
-            await message.delete()
-        except Exception:
-            pass
+    # Delete /start immediately in every chat so the command never
+    # remains visible while the welcome panel is being prepared.
+    try:
+        await message.delete()
+    except Exception:
+        pass
     
     # Skip if message from channel or anonymous admin
     if not message.from_user:
@@ -95,14 +97,19 @@ async def start(_, message: types.Message):
             reply_markup=key,
         )
 
-    # For private chats, add user to database if new
+    # Do not delay the welcome panel for database/logging work.
+    # These operations are intentionally scheduled in the background.
     if private:
-        if await db.is_user(message.from_user.id):
-            return  # User already exists, no need to add
-        # Log new user to logger group
-        await utils.send_log(message)
-        # Add user to database
-        return await db.add_user(message.from_user.id)
+        async def _register_user():
+            try:
+                if await db.is_user(message.from_user.id):
+                    return
+                await utils.send_log(message)
+                await db.add_user(message.from_user.id)
+            except Exception:
+                pass
+
+        asyncio.create_task(_register_user())
 
 
 @app.on_message(filters.command(["playmode", "settings"]) & filters.group & ~app.bl_users)
