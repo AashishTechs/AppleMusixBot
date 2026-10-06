@@ -26,7 +26,7 @@ from Elevenyts import app, db, lang
 broadcasting: bool = False
 
 
-@app.on_message(filters.command(["broadcast"]) & app.owner_filter)
+@app.on_message(filters.command(["broadcast"]))
 @lang.language()
 async def broadcast_message(_, message: types.Message) -> None:
     """
@@ -44,12 +44,12 @@ async def broadcast_message(_, message: types.Message) -> None:
     Returns:
         None
     """
-    # Auto-delete command message
-    try:
-        await message.delete()
-    except Exception:
-        pass
-    
+    # Keep the command handler visible to everyone, but allow execution only
+    # for the configured owner. This avoids silent failures when the owner
+    # filter is stale while the bot is running with a changed OWNER_ID.
+    if not message.from_user or message.from_user.id != app.owner:
+        return await message.reply_text("❌ This command is owner-only.")
+
     global broadcasting
 
     # Check if another broadcast is already running
@@ -109,7 +109,7 @@ async def broadcast_message(_, message: types.Message) -> None:
     )
 
 
-@app.on_message(filters.command(["stop_gcast", "stop_broadcast"]) & app.owner_filter)
+@app.on_message(filters.command(["stop_gcast", "stop_broadcast"]))
 @lang.language()
 async def stop_broadcast(_, message: types.Message) -> None:
     """
@@ -121,12 +121,11 @@ async def stop_broadcast(_, message: types.Message) -> None:
     Returns:
         None
     """
-    # Auto-delete command message
-    try:
-        await message.delete()
-    except Exception:
-        pass
-    
+    # Keep the command handler visible to everyone, but allow execution only
+    # for the configured owner.
+    if not message.from_user or message.from_user.id != app.owner:
+        return await message.reply_text("❌ This command is owner-only.")
+
     global broadcasting
 
     if not broadcasting:
