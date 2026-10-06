@@ -52,62 +52,50 @@ async def _help(_, m: types.Message):
 @app.on_message(filters.command(["start"]))
 @lang.language()
 async def start(_, message: types.Message):
-    """
-    Handle /start command - welcome message for users.
-
-    - In private chat: Shows welcome message with inline buttons
-    - In group chat: Shows short welcome message
-    - Adds new users to database
-    - Sends log to logger group for new users
-    """
+    """Handle /start and send the welcome panel without duplicate requests."""
     chat_id = message.chat.id
+
+    # If the user sends /start again while the first one is still uploading,
+    # ignore the duplicate instead of creating a second welcome panel.
     if chat_id in _START_IN_PROGRESS:
         return
     _START_IN_PROGRESS.add(chat_id)
 
     try:
-    # Skip if message from channel or anonymous admin
-    if not message.from_user:
-        return
+        if not message.from_user:
+            return
 
-    # Check if user is blacklisted
-    if message.from_user.id in app.bl_users and message.from_user.id not in db.notified:
-        return await message.reply_text(message.lang["bl_user_notify"])
+        if message.from_user.id in app.bl_users and message.from_user.id not in db.notified:
+            await message.reply_text(message.lang["bl_user_notify"])
+            return
 
-    # If /start help, show help menu
-    if len(message.command) > 1 and message.command[1] == "help":
-        return await _help(_, message)
+        if len(message.command) > 1 and message.command[1] == "help":
+            await _help(_, message)
+            return
 
-    # Determine if chat is private or group
-    private = message.chat.type == enums.ChatType.PRIVATE
+        private = message.chat.type == enums.ChatType.PRIVATE
+        text_value = message.lang["start"].format(message.from_user.mention)
+        key = buttons.start_key(message.lang, private)
 
-    # Use the Apple Musix welcome panel for both private and group /start.
-    # The locale currently provides the welcome text under the "start" key.
-    _text = message.lang["start"].format(message.from_user.mention)
+        try:
+            await message.reply_photo(
+                photo=config.START_IMG,
+                caption=text_value,
+                reply_markup=key,
+            )
+        except errors.ChatSendPhotosForbidden:
+            await message.reply_text(
+                text=text_value,
+                reply_markup=key,
+            )
 
-    key = buttons.start_key(message.lang, private)
-    try:
-        await message.reply_photo(
-            photo=config.START_IMG,
-            caption=_text,
-            reply_markup=key,
-        )
-    except errors.ChatSendPhotosForbidden:
-        # If photos are not allowed, send text only
-        await message.reply_text(
-            text=_text,
-            reply_markup=key,
-        )
+        # Delete the command only after the welcome panel is visible.
+        try:
+            await message.delete()
+        except Exception:
+            pass
 
-    # Remove /start only after the welcome panel is already on screen.
-    # The user therefore sees a clear command -> response flow.
-    try:
-        await message.delete()
-    except Exception:
-        pass
-
-        # Do not delay the welcome panel for database/logging work.
-        # These operations are intentionally scheduled in the background.
+        # Keep database/logging work out of the response path.
         if private:
             async def _register_user():
                 try:
