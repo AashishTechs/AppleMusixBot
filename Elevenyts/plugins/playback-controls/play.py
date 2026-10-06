@@ -465,10 +465,10 @@ async def play_hndlr(
             await app.send_message(
                 chat_id=m.chat.id,
                 text=(
-                    f"<blockquote>🔵 <b>QUEUED | #{position}</b> 💬</blockquote>\n\n"
-                    f"<blockquote>🎵 <b>SONG :</b> <a href=\"{file.url}\">{file.title}</a> 💬</blockquote>\n"
-                    f"<blockquote>⏱️ <b>LENGTH :</b> {file.duration} MIN 💬</blockquote>\n"
-                    f"<blockquote>👤 <b>USER :</b> {m.from_user.mention} 💬</blockquote>"
+                    f"<blockquote>🔵 <b>QUEUED | #{position}</b></blockquote>\n\n"
+                    f"<blockquote>🎵 <b>SONG :</b> <a href=\"{file.url}\">{file.title}</a></blockquote>\n"
+                    f"<blockquote>⏱️ <b>LENGTH :</b> {file.duration} MIN</blockquote>\n"
+                    f"<blockquote>👤 <b>USER :</b> {m.from_user.mention}</blockquote>"
                 ),
                 reply_markup=buttons.play_queued(
                     chat_id,
