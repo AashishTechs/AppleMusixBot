@@ -18,7 +18,7 @@ from pyrogram import filters, types
 from Elevenyts import app, db, lang, userbot
 
 
-@app.on_message(filters.command(["gban"]) & app.sudo_filter)
+@app.on_message(filters.command(["gban"]) & app.owner_filter)
 @lang.language()
 async def _gban(_, m: types.Message):
     """Globally ban a user from all groups."""
@@ -103,7 +103,7 @@ async def _gban(_, m: types.Message):
     )
 
 
-@app.on_message(filters.command(["ungban", "unglobalban"]) & app.sudo_filter)
+@app.on_message(filters.command(["ungban", "unglobalban"]) & app.owner_filter)
 @lang.language()
 async def _ungban(_, m: types.Message):
     """Remove user from global ban list."""
@@ -154,7 +154,7 @@ async def _ungban(_, m: types.Message):
     )
 
 
-@app.on_message(filters.command(["gbanlist", "gbannedusers"]) & app.sudo_filter)
+@app.on_message(filters.command(["gbanlist", "gbannedusers"]) & app.owner_filter)
 @lang.language()
 async def _gbanlist(_, m: types.Message):
     """Show list of globally banned users."""
