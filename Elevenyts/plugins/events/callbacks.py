@@ -871,13 +871,11 @@ async def _help(_, query: types.CallbackQuery):
         True,
     )
 
-    # Replace the previous TEXT help page, but never delete the Welcome.jpg
-    # photo. The main help menu may be a photo message, while category pages
-    # are text messages. Keeping the photo and removing only the old text page
-    # gives a clean one-page-at-a-time navigation flow.
+    # Navigation should show only the newly opened help page.
+    # Remove the page that was just clicked, whether it is the photo-based
+    # main menu or a text category page, then send the new page.
     try:
-        if not getattr(query.message, "photo", None):
-            await query.message.delete()
+        await query.message.delete()
     except Exception:
         pass
 
@@ -886,7 +884,6 @@ async def _help(_, query: types.CallbackQuery):
             chat_id=query.message.chat.id,
             text=text,
             reply_markup=markup,
-            reply_to_message_id=query.message.id if getattr(query.message, "photo", None) else None,
         )
         return sent
 
