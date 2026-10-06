@@ -373,17 +373,20 @@ class TgCall(PyTgCalls):
         )
 
         # --------------------------------------------------
-        # Thumbnail
+        # Start thumbnail generation in the background.
+        # Do not make VC playback wait for artwork processing.
         # --------------------------------------------------
 
+        thumb_task = None
         if (
             config.THUMB_GEN
             and isinstance(media, Track)
         ):
-            _thumb = await thumb.generate(media)
-
+            thumb_task = asyncio.create_task(
+                thumb.generate(media)
+            )
         else:
-            _thumb = config.DEFAULT_THUMB
+            thumb_task = None
 
         # --------------------------------------------------
         # Direct stream URL
@@ -396,6 +399,8 @@ class TgCall(PyTgCalls):
             stream_url = await self._get_stream_url(media)
 
             if not stream_url:
+                if thumb_task:
+                    thumb_task.cancel()
 
                 if message:
                     try:
@@ -551,32 +556,22 @@ class TgCall(PyTgCalls):
         # ==================================================
         # FFmpeg stream parameters
         # ==================================================
+        # Keep probing small so VC playback starts quickly while
+        # retaining a large input buffer and reconnect support.
 
-        if seek_time > 1:
-
-            ffmpeg_params = (
-                f"-ss {seek_time} "
-                f"-probesize 10M "
-                f"-analyzeduration 5M "
-                f"-rtbufsize 20M "
-                f"-thread_queue_size 4096 "
-                f"-reconnect 1 "
-                f"-reconnect_streamed 1 "
-                f"-reconnect_on_network_error 1 "
-                f"-reconnect_on_http_error 4xx,5xx "
-                f"-reconnect_delay_max 5 "
-                f"-fflags +genpts+igndts"
-            )
-
-        else:
-
-            ffmpeg_params = (
-                "-probesize 10M "
-                "-analyzeduration 5M "
-                "-rtbufsize 5M "
-                "-fflags +genpts+igndts "
-                "-sync ext"
-            )
+        ffmpeg_params = (
+            (f"-ss {seek_time} " if seek_time > 1 else "")
+            + "-probesize 1M "
+            + "-analyzeduration 1M "
+            + "-rtbufsize 20M "
+            + "-thread_queue_size 4096 "
+            + "-reconnect 1 "
+            + "-reconnect_streamed 1 "
+            + "-reconnect_on_network_error 1 "
+            + "-reconnect_on_http_error 4xx,5xx "
+            + "-reconnect_delay_max 5 "
+            + "-fflags +genpts+igndts"
+        )
 
         # ==================================================
         # Audio / video flags
@@ -720,6 +715,18 @@ class TgCall(PyTgCalls):
                         call = None
                         continue
                     raise
+
+            # Artwork is not allowed to delay the actual VC start.
+            # Finish it only after the stream is already playing.
+            if thumb_task:
+                try:
+                    _thumb = await thumb_task
+                except asyncio.CancelledError:
+                    _thumb = config.DEFAULT_THUMB
+                except Exception:
+                    _thumb = config.DEFAULT_THUMB
+            else:
+                _thumb = config.DEFAULT_THUMB
 
             # ==================================================
             # Voice command recording
