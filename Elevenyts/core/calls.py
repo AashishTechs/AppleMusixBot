@@ -558,7 +558,13 @@ class TgCall(PyTgCalls):
                 f"-ss {seek_time} "
                 f"-probesize 10M "
                 f"-analyzeduration 5M "
-                f"-rtbufsize 5M "
+                f"-rtbufsize 20M "
+                f"-thread_queue_size 4096 "
+                f"-reconnect 1 "
+                f"-reconnect_streamed 1 "
+                f"-reconnect_on_network_error 1 "
+                f"-reconnect_on_http_error 4xx,5xx "
+                f"-reconnect_delay_max 5 "
                 f"-fflags +genpts+igndts"
             )
 
@@ -594,7 +600,7 @@ class TgCall(PyTgCalls):
 
         stream = types.MediaStream(
             media_path=media.file_path,
-            audio_parameters=types.AudioQuality.STUDIO,
+            audio_parameters=types.AudioQuality.HIGH,
             audio_flags=types.MediaStream.Flags.REQUIRED,
             video_flags=video_flags,
             ffmpeg_parameters=ffmpeg_params,
