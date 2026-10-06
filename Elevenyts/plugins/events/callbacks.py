@@ -242,10 +242,9 @@ async def _controls(_, query: types.CallbackQuery):
             user
         )
 
-    await query.answer(
-        query.lang["processing"],
-        show_alert=True
-    )
+    # Do not acknowledge the callback before the action.
+    # A second answer later would cause QueryIdInvalid and make buttons
+    # appear unresponsive.
 
     # ------------------------------------------------------
     # PAUSE
