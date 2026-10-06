@@ -149,61 +149,75 @@ class Thumbnail:
     ) -> str:
 
         try:
-            # Compact reference-style 16:9 player.
+            # Fixed reference-style music card.
             player_w, player_h = 930, 523
 
             with Image.open(temp) as src:
                 source = src.convert("RGBA")
 
-                # Soft cinematic background.
-                bg = ImageOps.fit(
-                    source,
-                    (player_w, player_h),
-                    method=Image.Resampling.LANCZOS
-                )
-                bg = bg.filter(ImageFilter.GaussianBlur(26))
-                bg = ImageEnhance.Brightness(bg).enhance(0.30)
-                bg = ImageEnhance.Contrast(bg).enhance(1.12)
-                bg = Image.alpha_composite(
-                    bg,
-                    Image.new("RGBA", (player_w, player_h), (4, 12, 22, 125))
-                )
-
-                card = Image.new("RGBA", (player_w, player_h), (12, 22, 34, 248))
+                # One fixed background for the entire card.
+                bg_color = (77, 105, 126, 255)
+                card = Image.new("RGBA", (player_w, player_h), bg_color)
                 draw = ImageDraw.Draw(card)
 
-                # Artwork: square, clean and fully visible.
-                # Do NOT crop the source thumbnail: YouTube artwork often
-                # contains important title/artist text near the edges.
-                art_w = 430
-                art_h = 430
-                art_box = Image.new("RGBA", (art_w, art_h), (12, 22, 34, 255))
+                # Soft inner highlight, while keeping the background color fixed.
+                draw.rounded_rectangle(
+                    (1, 1, player_w - 2, player_h - 2),
+                    radius=30,
+                    outline=(115, 140, 158, 255),
+                    width=2
+                )
 
-                # Preserve the complete artwork with proportional scaling.
-                # This may leave small letterbox areas, but never cuts the
-                # original image.
+                # Artwork box: complete source image must fit inside it.
+                # Nothing is cropped from any side.
+                art_size = 360
+                art_x, art_y = 42, 72
+
+                art_box = Image.new(
+                    "RGBA",
+                    (art_size, art_size),
+                    (58, 80, 96, 255)
+                )
+
                 art = ImageOps.contain(
                     source,
-                    (art_w, art_h),
+                    (art_size, art_size),
                     method=Image.Resampling.LANCZOS
                 )
-                art = ImageEnhance.Color(art).enhance(1.08)
+                art = ImageEnhance.Color(art).enhance(1.05)
 
-                art_x = (art_w - art.width) // 2
-                art_y = (art_h - art.height) // 2
-                art_box.alpha_composite(art, (art_x, art_y))
+                ax = (art_size - art.width) // 2
+                ay = (art_size - art.height) // 2
+                art_box.alpha_composite(art, (ax, ay))
 
-                art_mask = Image.new("L", art_box.size, 0)
+                art_mask = Image.new("L", (art_size, art_size), 0)
                 ImageDraw.Draw(art_mask).rounded_rectangle(
-                    (0, 0, art_w - 1, art_h - 1),
-                    radius=24,
+                    (0, 0, art_size - 1, art_size - 1),
+                    radius=22,
                     fill=255
                 )
-                card.paste(art_box, (17, 17), art_mask)
+                card.paste(art_box, (art_x, art_y), art_mask)
 
-                # Right player section.
-                rx = 482
-                rw = player_w - rx - 30
+                # Right-side song information, matching the reference layout.
+                rx = 450
+                rw = player_w - rx - 42
+
+                now_font = ImageFont.truetype(
+                    "Elevenyts/helpers/Raleway-Bold.ttf", 24
+                )
+                artist_font = ImageFont.truetype(
+                    "Elevenyts/helpers/Inter-Light.ttf", 30
+                )
+                small_font = ImageFont.truetype(
+                    "Elevenyts/helpers/Inter-Light.ttf", 22
+                )
+
+                draw.text(
+                    (rx, 105),
+                    "NOW PLAYING",
+                    fill=(214, 229, 241),
+                    font=now_font
+                )
 
                 title = trim_to_width(
                     str(song.title or "Unknown Track"),
@@ -212,137 +226,93 @@ class Thumbnail:
                 )
                 artist = trim_to_width(
                     str(song.channel_name or "Apple Musix"),
-                    self.regular_font,
+                    artist_font,
                     rw
                 )
 
                 draw.text(
-                    (rx, 62),
+                    (rx, 157),
                     title,
                     fill=(248, 250, 252),
                     font=self.title_font
                 )
+
                 draw.text(
-                    (rx, 112),
+                    (rx, 218),
                     artist,
-                    fill=(190, 208, 225),
-                    font=self.regular_font
+                    fill=(205, 221, 234),
+                    font=artist_font
                 )
 
-                # Progress bar and timestamps.
-                bar_x = rx
-                bar_w = rw
-                bar_y = 178
+                # Duration shown as song metadata.
+                duration = str(getattr(song, "duration", "") or "")
+                duration_label = f"Duration  •  {duration}" if duration else "Duration  •  --:--"
+                draw.text(
+                    (rx, 270),
+                    duration_label,
+                    fill=(190, 209, 223),
+                    font=small_font
+                )
+
+                # Reference-style Play pill.
+                pill_x, pill_y = rx, 323
+                pill_w, pill_h = 205, 66
 
                 draw.rounded_rectangle(
-                    (bar_x, bar_y, bar_x + bar_w, bar_y + 7),
-                    radius=5,
-                    fill=(92, 108, 124)
+                    (pill_x, pill_y, pill_x + pill_w, pill_y + pill_h),
+                    radius=33,
+                    fill=(100, 132, 155, 255)
                 )
-                played_w = int(bar_w * 0.22)
-                draw.rounded_rectangle(
-                    (bar_x, bar_y, bar_x + played_w, bar_y + 7),
-                    radius=5,
-                    fill=(245, 248, 252)
+
+                # Play triangle.
+                py = pill_y + pill_h // 2
+                draw.polygon(
+                    [
+                        (pill_x + 38, py - 18),
+                        (pill_x + 38, py + 18),
+                        (pill_x + 64, py)
+                    ],
+                    fill=(250, 252, 255, 255)
+                )
+
+                draw.text(
+                    (pill_x + 82, pill_y + 12),
+                    "Play",
+                    fill=(250, 252, 255, 255),
+                    font=ImageFont.truetype(
+                        "Elevenyts/helpers/Raleway-Bold.ttf", 30
+                    )
+                )
+
+                # Music icon in the upper-right corner.
+                mx, my = player_w - 80, 46
+                draw.rectangle(
+                    (mx - 2, my + 12, mx + 4, my + 55),
+                    fill=(248, 250, 252, 255)
+                )
+                draw.rectangle(
+                    (mx + 22, my + 4, mx + 28, my + 47),
+                    fill=(248, 250, 252, 255)
+                )
+                draw.polygon(
+                    [(mx - 2, my + 12), (mx + 28, my + 4),
+                     (mx + 28, my + 14), (mx - 2, my + 22)],
+                    fill=(248, 250, 252, 255)
                 )
                 draw.ellipse(
-                    (bar_x + played_w - 7, bar_y - 4,
-                     bar_x + played_w + 7, bar_y + 10),
-                    fill=(250, 252, 255)
+                    (mx - 17, my + 47, mx + 5, my + 63),
+                    fill=(248, 250, 252, 255)
+                )
+                draw.ellipse(
+                    (mx + 10, my + 39, mx + 32, my + 55),
+                    fill=(248, 250, 252, 255)
                 )
 
+                # Small Apple Musix signature below the artwork.
                 draw.text(
-                    (bar_x, 194),
-                    "0:00",
-                    fill=(205, 216, 228),
-                    font=self.regular_font
-                )
-
-                duration = str(getattr(song, "duration", "") or "")
-                duration_text = f"-{duration}" if duration else "-:--"
-                db = draw.textbbox((0, 0), duration_text, font=self.regular_font)
-                draw.text(
-                    (bar_x + bar_w - (db[2] - db[0]), 194),
-                    duration_text,
-                    fill=(205, 216, 228),
-                    font=self.regular_font
-                )
-
-                # Manual playback icons: avoids broken/boxed Unicode glyphs.
-                cy = 285
-                cx = rx + bar_w // 2
-
-                # Previous: triangle + vertical bar.
-                draw.polygon(
-                    [(cx - 112, cy), (cx - 88, cy - 20), (cx - 88, cy + 20)],
-                    fill=(248, 250, 252)
-                )
-                draw.polygon(
-                    [(cx - 88, cy), (cx - 64, cy - 20), (cx - 64, cy + 20)],
-                    fill=(248, 250, 252)
-                )
-                draw.rectangle(
-                    (cx - 120, cy - 21, cx - 115, cy + 21),
-                    fill=(248, 250, 252)
-                )
-
-                # Pause.
-                draw.rounded_rectangle(
-                    (cx - 10, cy - 25, cx - 1, cy + 25),
-                    radius=3,
-                    fill=(248, 250, 252)
-                )
-                draw.rounded_rectangle(
-                    (cx + 8, cy - 25, cx + 17, cy + 25),
-                    radius=3,
-                    fill=(248, 250, 252)
-                )
-
-                # Next: two triangles + vertical bar.
-                draw.polygon(
-                    [(cx + 64, cy - 20), (cx + 88, cy), (cx + 64, cy + 20)],
-                    fill=(248, 250, 252)
-                )
-                draw.polygon(
-                    [(cx + 88, cy - 20), (cx + 112, cy), (cx + 88, cy + 20)],
-                    fill=(248, 250, 252)
-                )
-                draw.rectangle(
-                    (cx + 116, cy - 21, cx + 121, cy + 21),
-                    fill=(248, 250, 252)
-                )
-
-                # Volume icon + volume bar.
-                vy = 358
-                draw.polygon(
-                    [(rx, vy + 5), (rx + 13, vy + 5), (rx + 28, vy - 10),
-                     (rx + 28, vy + 25), (rx + 13, vy + 10), (rx, vy + 10)],
-                    fill=(225, 235, 244)
-                )
-                draw.arc(
-                    (rx + 18, vy - 4, rx + 50, vy + 22),
-                    start=300,
-                    end=60,
-                    fill=(225, 235, 244),
-                    width=3
-                )
-                vol_x = rx + 58
-                vol_w = bar_w - 58
-                draw.rounded_rectangle(
-                    (vol_x, vy + 7, vol_x + vol_w, vy + 13),
-                    radius=4,
-                    fill=(92, 108, 124)
-                )
-                draw.rounded_rectangle(
-                    (vol_x, vy + 7, vol_x + int(vol_w * 0.68), vy + 13),
-                    radius=4,
-                    fill=(245, 248, 252)
-                )
-                # Signature sits below the artwork instead of overlapping it.
-                draw.text(
-                    (28, player_h - 39),
+                    (art_x + 2, art_y + art_size + 12),
                     "Apple Musix <<3",
-                    fill=(80, 185, 240),
+                    fill=(225, 239, 248, 255),
                     font=self.signature_font
                 )
 
@@ -354,9 +324,8 @@ class Thumbnail:
                     fill=255
                 )
 
-                final = Image.new("RGBA", (player_w, player_h), (6, 14, 24, 255))
+                final = Image.new("RGBA", (player_w, player_h), bg_color)
                 final.paste(card, (0, 0), mask)
-
                 final.save(output)
 
             try:
@@ -365,6 +334,7 @@ class Thumbnail:
                 pass
 
             return output
+
 
 
 
