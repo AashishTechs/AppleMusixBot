@@ -19,7 +19,7 @@ from Elevenyts import app, db, lang
 from Elevenyts.helpers import utils
 
 
-@app.on_message(filters.command(["addsudo", "delsudo", "rmsudo"]) & app.sudo_filter)
+@app.on_message(filters.command(["addsudo", "delsudo", "rmsudo"]) & app.owner_filter)
 @lang.language()
 async def _sudo(_, m: types.Message):
     # Auto-delete command message
@@ -37,7 +37,7 @@ async def _sudo(_, m: types.Message):
             return await m.reply_text(m.lang["sudo_already"].format(user.mention))
 
         app.sudoers.add(user.id)
-        app.sudo_filter.update([user.id])
+        app.owner_filter.update([user.id])
         await db.add_sudo(user.id)
         await m.reply_text(m.lang["sudo_added"].format(user.mention))
     else:
@@ -45,8 +45,8 @@ async def _sudo(_, m: types.Message):
             return await m.reply_text(m.lang["sudo_not"].format(user.mention))
 
         app.sudoers.discard(user.id)
-        app.sudo_filter.update([])  # Reset filter
-        app.sudo_filter.update(app.sudoers)  # Rebuild with remaining users
+        app.owner_filter.update([])  # Reset filter
+        app.owner_filter.update(app.sudoers)  # Rebuild with remaining users
         await db.del_sudo(user.id)
         await m.reply_text(m.lang["sudo_removed"].format(user.mention))
 
@@ -54,7 +54,7 @@ async def _sudo(_, m: types.Message):
 o_mention = None
 
 
-@app.on_message(filters.command(["listsudo", "sudolist"]) & app.sudo_filter)
+@app.on_message(filters.command(["listsudo", "sudolist"]) & app.owner_filter)
 @lang.language()
 async def _listsudo(_, m: types.Message):
     # Auto-delete command message
