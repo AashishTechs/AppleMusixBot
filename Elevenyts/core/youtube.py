@@ -594,6 +594,7 @@ class YouTube:
         if not video:
 
             ydl_opts["format"] = (
+                "bestaudio[ext=m4a][acodec!=none]/"
                 "bestaudio[acodec!=none]/"
                 "bestaudio/best"
             )
