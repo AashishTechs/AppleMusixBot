@@ -192,7 +192,7 @@ class Inline:
                 [
                     self.ikb(
                         text="▷",
-                        callback_data=f"controls resume {chat_id}",
+                        callback_data=f"controls force {chat_id} {item_id}",
                         style=ButtonStyle.SUCCESS,
                     ),
                     self.ikb(
