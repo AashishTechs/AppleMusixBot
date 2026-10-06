@@ -871,16 +871,22 @@ async def _help(_, query: types.CallbackQuery):
         True,
     )
 
-    # Keep the Welcome.jpg help panel visible. Telegram cannot convert a
-    # photo message into a long text table, so category pages are sent as
-    # normal text messages instead of deleting the welcome panel. This avoids
-    # the "Deleted message" / cleared-chat effect when ADMIN is opened.
+    # Replace the previous TEXT help page, but never delete the Welcome.jpg
+    # photo. The main help menu may be a photo message, while category pages
+    # are text messages. Keeping the photo and removing only the old text page
+    # gives a clean one-page-at-a-time navigation flow.
+    try:
+        if not getattr(query.message, "photo", None):
+            await query.message.delete()
+    except Exception:
+        pass
+
     try:
         sent = await app.send_message(
             chat_id=query.message.chat.id,
             text=text,
             reply_markup=markup,
-            reply_to_message_id=query.message.id,
+            reply_to_message_id=query.message.id if getattr(query.message, "photo", None) else None,
         )
         return sent
 
