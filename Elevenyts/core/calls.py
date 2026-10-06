@@ -601,139 +601,118 @@ class TgCall(PyTgCalls):
         )
 
         # ==================================================
-        # Make sure old call is disconnected
+        # Keep an existing voice-chat connection alive.
+        #
+        # IMPORTANT:
+        # Do NOT leave and immediately re-join the VC for every
+        # track. Telegram can rate-limit phone.JoinGroupCall and
+        # return FLOOD_WAIT_X. If we are already connected, use
+        # change_stream() so only the media source is replaced.
         # ==================================================
 
+        call = None
+
         try:
-
-            call = await client.get_call(
-                chat_id
-            )
-
-            if call:
-
-                logger.debug(
-                    f"Already connected to {chat_id}, "
-                    f"leaving before reconnecting..."
-                )
-
-                await client.leave_call(
-                    chat_id,
-                    close=False,
-                )
-
+            call = await client.get_call(chat_id)
         except (
             ConnectionNotFound,
             exceptions.NotInCallError,
         ):
-            pass
-
+            call = None
         except Exception as e:
-
             logger.debug(
-                f"Error checking connection state "
-                f"for {chat_id}: {e}"
+                f"Could not inspect VC connection for "
+                f"{chat_id}: {e}"
             )
 
         # ==================================================
-        # Start playback
+        # Start / change playback
         # ==================================================
 
         max_retries = 3
-        retry_delay = 1
+        retry_delay = 2
 
         try:
-
             for attempt in range(max_retries):
-
                 try:
-
-                    await client.play(
-                        chat_id=chat_id,
-                        stream=stream,
-                        config=types.GroupCallConfig(
-                            auto_start=True
-                        ),
-                    )
+                    if call:
+                        logger.debug(
+                            f"Changing stream in existing VC "
+                            f"for {chat_id}"
+                        )
+                        await client.change_stream(
+                            chat_id=chat_id,
+                            stream=stream,
+                            config=types.GroupCallConfig(
+                                auto_start=True
+                            ),
+                        )
+                    else:
+                        logger.debug(
+                            f"Joining VC for playback in {chat_id}"
+                        )
+                        await client.play(
+                            chat_id=chat_id,
+                            stream=stream,
+                            config=types.GroupCallConfig(
+                                auto_start=True
+                            ),
+                        )
 
                     break
 
-                except (
-                    exceptions.NoActiveGroupCall,
-                    errors.RPCError,
-                ) as e:
-
-                    error_msg = str(e)
-
-                    if (
-                        "GROUPCALL_INVALID"
-                        in error_msg
-                        or "GROUPCALL"
-                        in error_msg
-                        or isinstance(
-                            e,
-                            exceptions.NoActiveGroupCall,
-                        )
-                    ):
-
-                        if attempt < max_retries - 1:
-
-                            logger.debug(
-                                f"Group call transitioning "
-                                f"for {chat_id}, retrying in "
-                                f"{retry_delay}s... "
-                                f"(attempt "
-                                f"{attempt + 1}/"
-                                f"{max_retries})"
-                            )
-
-                            await asyncio.sleep(
-                                retry_delay
-                            )
-
-                            continue
-
+                except errors.FloodWait as fw:
+                    wait_time = int(getattr(fw, "value", 5)) + 1
+                    logger.warning(
+                        f"Telegram FloodWait while starting playback "
+                        f"in {chat_id}: waiting {wait_time}s"
+                    )
+                    if attempt >= max_retries - 1:
                         raise
+                    await asyncio.sleep(wait_time)
+                    call = None
 
-                    raise
+                except exceptions.NoActiveGroupCall:
+                    if attempt >= max_retries - 1:
+                        raise
+                    logger.debug(
+                        f"VC is transitioning for {chat_id}, "
+                        f"retrying in {retry_delay}s "
+                        f"(attempt {attempt + 1}/{max_retries})"
+                    )
+                    await asyncio.sleep(retry_delay)
+                    call = None
+
+                except errors.RPCError as e:
+                    error_msg = str(e)
+                    if "GROUPCALL" in error_msg:
+                        if attempt >= max_retries - 1:
+                            raise
+                        logger.debug(
+                            f"Group call error for {chat_id}, "
+                            f"retrying in {retry_delay}s "
+                            f"(attempt {attempt + 1}/{max_retries})"
+                        )
+                        await asyncio.sleep(retry_delay)
+                        call = None
+                    else:
+                        raise
 
                 except Exception as e:
-
                     error_msg = str(e).lower()
-
                     if (
-                        "cannot be initialized "
-                        "more than once"
-                        in error_msg
-                        or "connection"
-                        in error_msg
+                        "cannot be initialized more than once" in error_msg
+                        or "connection" in error_msg
                     ):
-
-                        if attempt < max_retries - 1:
-
-                            logger.debug(
-                                f"Connection error for "
-                                f"{chat_id}, leaving and "
-                                f"retrying..."
-                            )
-
-                            try:
-                                await client.leave_call(
-                                    chat_id,
-                                    close=False,
-                                )
-
-                                await asyncio.sleep(
-                                    retry_delay
-                                )
-
-                            except Exception:
-                                pass
-
-                            continue
-
-                        raise
-
+                        if attempt >= max_retries - 1:
+                            raise
+                        logger.debug(
+                            f"Connection error for {chat_id}, "
+                            f"retrying in {retry_delay}s"
+                        )
+                        await asyncio.sleep(retry_delay)
+                        call = None
+                        continue
                     raise
 
             # ==================================================
