@@ -161,12 +161,8 @@ class Thumbnail:
                 draw = ImageDraw.Draw(card)
 
                 # Soft inner highlight, while keeping the background color fixed.
-                draw.rounded_rectangle(
-                    (1, 1, player_w - 2, player_h - 2),
-                    radius=30,
-                    outline=(115, 140, 158, 255),
-                    width=2
-                )
+                # Clean card: no visible outer border.
+
 
                 # Artwork: TRUE SQUARE cover.
                 # The player always shows a 1:1 cover area.  The source is
@@ -225,7 +221,7 @@ class Thumbnail:
                 draw.text(
                     (rx, 105),
                     "NOW PLAYING",
-                    fill=(214, 229, 241),
+                    fill=(150, 225, 255),
                     font=now_font
                 )
 
@@ -243,14 +239,14 @@ class Thumbnail:
                 draw.text(
                     (rx, 157),
                     title,
-                    fill=(248, 250, 252),
+                    fill=(255, 255, 255),
                     font=self.title_font
                 )
 
                 draw.text(
                     (rx, 218),
                     artist,
-                    fill=(205, 221, 234),
+                    fill=(105, 215, 245),
                     font=artist_font
                 )
 
@@ -260,7 +256,7 @@ class Thumbnail:
                 draw.text(
                     (rx, 270),
                     duration_label,
-                    fill=(190, 209, 223),
+                    fill=(190, 202, 214),
                     font=small_font
                 )
 
@@ -271,7 +267,7 @@ class Thumbnail:
                 draw.rounded_rectangle(
                     (pill_x, pill_y, pill_x + pill_w, pill_y + pill_h),
                     radius=33,
-                    fill=(100, 132, 155, 255)
+                    fill=(82, 126, 151, 255)
                 )
 
                 # Play triangle.
@@ -288,7 +284,7 @@ class Thumbnail:
                 draw.text(
                     (pill_x + 82, pill_y + 12),
                     "Play",
-                    fill=(250, 252, 255, 255),
+                    fill=(255, 255, 255, 255),
                     font=ImageFont.truetype(
                         "Elevenyts/helpers/Raleway-Bold.ttf", 30
                     )
@@ -322,7 +318,7 @@ class Thumbnail:
                 draw.text(
                     (art_x + 2, art_y + art_size + 12),
                     "Apple Musix <<3",
-                    fill=(225, 239, 248, 255),
+                    fill=(145, 225, 250, 255),
                     font=self.signature_font
                 )
 
