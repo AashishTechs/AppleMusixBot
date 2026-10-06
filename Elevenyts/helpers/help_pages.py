@@ -387,8 +387,8 @@ def format_help_page(category):
     def make_table(headers, rows):
         # Kept narrow enough for Telegram mobile while still looking like
         # the Command | Description tables in the reference screenshots.
-        cmd_width = 19
-        desc_width = 25
+        cmd_width = 17
+        desc_width = 22
 
         def border(left, middle, right, fill="─"):
             return (
