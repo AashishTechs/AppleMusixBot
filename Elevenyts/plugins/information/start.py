@@ -89,11 +89,10 @@ async def start(_, message: types.Message):
                 reply_markup=key,
             )
 
-        # Delete the command only after the welcome panel is visible.
-        try:
-            await message.delete()
-        except Exception:
-            pass
+        # Do not wait for Telegram to delete /start.  The welcome panel
+        # is already visible, so deletion can happen in the background and
+        # does not add another network round-trip to the user's response time.
+        asyncio.create_task(message.delete())
 
         # Keep database/logging work out of the response path.
         if private:
