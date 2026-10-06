@@ -53,15 +53,15 @@ SMALL = _font(19)
 PAGES = {
     "admins": {
         "title": "Admin Commands",
-        "desc": "Commands available to group administrators.",
+        "desc": "Commands available only to administrators.",
         "sections": [
             {
                 "title": "Play Mode",
                 "table": (
                     ["Command", "Description"],
                     [
-                        ["/playmode", "Open Play Mode settings and choose who can use playback commands."],
-                        ["/settings", "Open the group settings panel, including Play Mode."],
+                        ["/playmode", "Open Play Mode settings and choose whether playback is available to everyone or administrators only."],
+                        ["/settings", "Open the group settings panel and manage the current Play Mode."],
                     ],
                 ),
             },
@@ -71,12 +71,14 @@ PAGES = {
                     ["Command", "Description"],
                     [
                         ["/play <query>", "Play a song or YouTube search result in the voice chat."],
+                        ["/playforce <query>", "Force-play the requested track immediately."],
                         ["/vplay <query>", "Play a video in the video chat."],
-                        ["/cplay <query>", "Play using the linked channel."],
-                        ["/playforce <query>", "Force-play a requested track immediately."],
-                        ["/cplayforce <query>", "Force-play through the linked channel."],
-                        ["/queue", "Show the current queue."],
-                        ["/shuffle", "Shuffle queued tracks."],
+                        ["/vplayforce <query>", "Force-play the requested video immediately."],
+                        ["/cplay <query>", "Play music using the linked channel."],
+                        ["/cplayforce <query>", "Force-play music using the linked channel."],
+                        ["/cvplay <query>", "Play a video using the linked channel."],
+                        ["/cvplayforce <query>", "Force-play a video using the linked channel."],
+                        ["/channelplay [linked|id|disable]", "Enable, configure, or disable channel play for the group."],
                     ],
                 ),
             },
@@ -85,20 +87,22 @@ PAGES = {
                 "table": (
                     ["Command", "Description"],
                     [
-                        ["/pause", "Pause the current playing stream."],
-                        ["/resume", "Resume the paused stream."],
-                        ["/skip /next", "Skip the current stream and play the next track."],
-                        ["/end /stop", "Stop playback and clear the queue."],
-                        ["/loop [1-10]", "Repeat the current track for the selected number of times."],
-                        ["/seek [time]", "Seek to the requested timestamp."],
-                        ["/seekback [time]", "Seek backward to the requested timestamp."],
+                        ["/pause /cpause", "Pause the current playing stream."],
+                        ["/resume /cresume", "Resume the paused stream."],
+                        ["/skip /next /cskip /cnext", "Skip the current stream and play the next track in queue."],
+                        ["/end /stop /cend /cstop", "Stop playback and clear the queue."],
+                        ["/queue /playing /cqueue /cplaying", "Show the current queue."],
+                        ["/shuffle /cshuffle", "Shuffle the queued tracks."],
+                        ["/loop [mode] /cloop [mode]", "Cycle or set the loop mode for the current playback."],
+                        ["/seek [seconds] /cseek [seconds]", "Seek forward to the requested number of seconds."],
+                        ["/seekback [seconds] /cseekback [seconds]", "Seek backward to the requested number of seconds."],
                     ],
                 ),
             },
         ],
         "notes": [
-            "Commands follow the group's current Play Mode permission.",
-            "Prefix supported commands with c for linked-channel playback.",
+            "Prefix commands with c to use them in linked channels.",
+            "Example: /cpause, /cskip, /cqueue",
         ],
     },
     "auth": {
@@ -459,7 +463,7 @@ def render_help_page(category, out_dir="/tmp"):
 
         for row in [headers] + rows:
             f_left = HEADER_FONT if row is headers else BODY
-            f_right = HEADER_FONT if row is headers else BODY_BOLD
+            f_right = HEADER_FONT if row is headers else BODY
             left_lines = _wrap(draw, row[0], f_left, col1 - 26)
             right_lines = _wrap(draw, row[1], f_right, col2 - 26)
             row_heights.append(max(len(left_lines), len(right_lines)) * 28 + 22)
@@ -485,14 +489,14 @@ def render_help_page(category, out_dir="/tmp"):
             draw.line((table_x + col1, cy, table_x + col1, cy + rh), fill=BORDER, width=1)
 
             f_left = HEADER_FONT if idx == 0 else BODY
-            f_right = HEADER_FONT if idx == 0 else BODY_BOLD
+            f_right = HEADER_FONT if idx == 0 else BODY
             left_lines = _wrap(draw, row[0], f_left, col1 - 26)
             right_lines = _wrap(draw, row[1], f_right, col2 - 26)
 
             ly = cy + (rh - len(left_lines) * 28) / 2
             ry = cy + (rh - len(right_lines) * 28) / 2
             for line in left_lines:
-                draw.text((table_x + 13, ly), line, font=f_left, fill=TEXT if idx == 0 else COMMAND)
+                draw.text((table_x + 13, ly), line, font=f_left, fill=TEXT)
                 ly += 28
             for line in right_lines:
                 draw.text((table_x + col1 + 13, ry), line, font=f_right, fill=TEXT)
