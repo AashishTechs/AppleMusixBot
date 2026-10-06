@@ -21,6 +21,9 @@ from pyrogram import enums, errors, filters, types
 from Elevenyts import app, config, db, lang
 from Elevenyts.helpers import buttons, utils
 
+_START_IN_PROGRESS = set()
+
+
 
 @app.on_message(filters.command(["help"]) & filters.private & ~app.bl_users)
 @lang.language()
@@ -57,18 +60,12 @@ async def start(_, message: types.Message):
     - Adds new users to database
     - Sends log to logger group for new users
     """
-    # Keep /start visible while the welcome panel is being prepared.
-    # This makes the command feel like a normal working Telegram command
-    # instead of disappearing before the response suddenly appears.
+    chat_id = message.chat.id
+    if chat_id in _START_IN_PROGRESS:
+        return
+    _START_IN_PROGRESS.add(chat_id)
+
     try:
-        await app.send_chat_action(
-            message.chat.id,
-            enums.ChatAction.UPLOAD_PHOTO,
-        )
-        await asyncio.sleep(0.4)
-    except Exception:
-        pass
-    
     # Skip if message from channel or anonymous admin
     if not message.from_user:
         return
@@ -109,19 +106,21 @@ async def start(_, message: types.Message):
     except Exception:
         pass
 
-    # Do not delay the welcome panel for database/logging work.
-    # These operations are intentionally scheduled in the background.
-    if private:
-        async def _register_user():
-            try:
-                if await db.is_user(message.from_user.id):
-                    return
-                await utils.send_log(message)
-                await db.add_user(message.from_user.id)
-            except Exception:
-                pass
+        # Do not delay the welcome panel for database/logging work.
+        # These operations are intentionally scheduled in the background.
+        if private:
+            async def _register_user():
+                try:
+                    if await db.is_user(message.from_user.id):
+                        return
+                    await utils.send_log(message)
+                    await db.add_user(message.from_user.id)
+                except Exception:
+                    pass
 
-        asyncio.create_task(_register_user())
+            asyncio.create_task(_register_user())
+    finally:
+        _START_IN_PROGRESS.discard(chat_id)
 
 
 @app.on_message(filters.command(["playmode", "settings"]) & filters.group & ~app.bl_users)
