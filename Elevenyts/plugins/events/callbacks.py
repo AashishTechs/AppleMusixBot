@@ -872,30 +872,20 @@ async def _help(_, query: types.CallbackQuery):
     )
 
     # Category pages are real Telegram text messages, not generated screenshots.
+    # A help menu opened with /help is a photo message (Welcome.jpg), so it
+    # cannot be converted into a text message. Delete the old page first,
+    # then send the selected category as a clean text-only page.
     try:
-        await query.edit_message_text(
-            text=text,
-            reply_markup=markup,
-        )
-        return
+        await query.message.delete()
     except Exception:
         pass
 
     try:
-        reply_to = getattr(query.message, "reply_to_message_id", None)
-
         sent = await app.send_message(
             chat_id=query.message.chat.id,
             text=text,
             reply_markup=markup,
-            reply_to_message_id=reply_to,
         )
-
-        try:
-            await query.message.delete()
-        except Exception:
-            pass
-
         return sent
 
     except Exception as e:
