@@ -287,21 +287,22 @@ async def play_hndlr(
     play_emoji = m.lang["play_emoji"]
 
     try:
-        if SEARCHING_IMAGE.exists():
-            sent = await m.reply_photo(
-                photo=str(SEARCHING_IMAGE),
+        if not SEARCHING_IMAGE.is_file():
+            logger.error(
+                f"Searching image not found: {SEARCHING_IMAGE}"
             )
-        else:
-            sent = await safe_reply(
-                m,
-                m.lang["play_searching"].format(play_emoji),
+            return
+
+        with SEARCHING_IMAGE.open("rb") as searching_photo:
+            sent = await m.reply_photo(
+                photo=searching_photo,
             )
 
-    except Exception:
-        sent = await safe_reply(
-            m,
-            m.lang["play_searching"].format(play_emoji),
+    except Exception as e:
+        logger.exception(
+            f"Failed to send searching image: {e}"
         )
+        return
 
     if not sent:
         return
