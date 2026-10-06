@@ -388,6 +388,8 @@ async def _controls(_, query: types.CallbackQuery):
         # Fresh direct stream URL.
         # --------------------------------------------------
 
+        await query.answer("▶ Playing selected track...", show_alert=False)
+
         stream_url = await get_direct_stream(media)
 
         if not stream_url:
