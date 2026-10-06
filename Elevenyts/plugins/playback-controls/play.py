@@ -455,9 +455,16 @@ async def play_hndlr(
 
         if await db.get_call(chat_id):
 
-            await safe_edit(
-                sent,
-                (
+            # The searching indicator is a sticker, so it cannot be edited
+            # into the queued card. Remove it first and send a fresh message.
+            try:
+                await sent.delete()
+            except Exception:
+                pass
+
+            await app.send_message(
+                chat_id=m.chat.id,
+                text=(
                     f"<blockquote>🔵 <b>QUEUED | #{position}</b> 💬</blockquote>\n\n"
                     f"<blockquote>🎵 <b>SONG :</b> <a href=\"{file.url}\">{file.title}</a> 💬</blockquote>\n"
                     f"<blockquote>⏱️ <b>LENGTH :</b> {file.duration} MIN 💬</blockquote>\n"
