@@ -97,10 +97,36 @@ BOT_COMMANDS = [
 ]
 
 async def install_bot_commands():
-    """Publish the complete command menu for all Telegram users."""
+    """Publish private and group command menus with the correct Telegram scopes."""
     try:
+        # Default/private menu: keep the complete command list.
         await app.set_bot_commands(BOT_COMMANDS)
-        logger.info("⌨️ Telegram command menu installed: %d commands.", len(BOT_COMMANDS))
+
+        # Group menu: hide owner-only maintenance/admin commands, while keeping
+        # normal group commands such as /auth visible. Handler permissions still
+        # decide who can actually execute each command.
+        hidden_from_groups = {
+            "broadcast", "stop_gcast", "stop_broadcast",
+            "addsudo", "delsudo", "rmsudo", "listsudo", "sudolist",
+            "gban", "ungban", "unglobalban", "gbanlist", "gbannedusers",
+            "blacklistchat", "whitelistchat", "blacklistedchat", "blchats",
+            "block", "unblock", "blockedusers", "blusers",
+            "leave", "autoleave", "maintenance", "reboot", "restart", "eval",
+        }
+        group_commands = [
+            command for command in BOT_COMMANDS
+            if command.command not in hidden_from_groups
+        ]
+        await app.set_bot_commands(
+            group_commands,
+            scope=types.BotCommandScopeAllGroupChats(),
+        )
+
+        logger.info(
+            "⌨️ Telegram command menus installed: %d private, %d group commands.",
+            len(BOT_COMMANDS),
+            len(group_commands),
+        )
     except Exception as e:
         logger.error("Failed to install Telegram command menu: %s", e, exc_info=True)
 
