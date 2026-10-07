@@ -166,7 +166,8 @@ async def _block_user(_, m: types.Message):
     if user_id in app.sudoers:
         return await m.reply_text("<blockquote>❌ Cannot block sudo users</blockquote>")
     
-    if user_id in app.bl_users:
+    blocked_users = await db.get_blacklisted()
+    if user_id in blocked_users:
         return await m.reply_text(
             f"<blockquote>⚠️ {user_mention} is already blocked</blockquote>"
         )
@@ -215,7 +216,8 @@ async def _unblock_user(_, m: types.Message):
             "ᴏʀ ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴜꜱᴇʀ</blockquote>"
         )
     
-    if user_id not in app.bl_users:
+    blocked_users = await db.get_blacklisted()
+    if user_id not in blocked_users:
         return await m.reply_text(
             f"<blockquote>⚠️ {user_mention} is not blocked</blockquote>"
         )
