@@ -272,42 +272,30 @@ async def _get_broadcast_recipients(flags: List[str]) -> Tuple[List[int], List[i
 
 async def _log_broadcast_start(message: types.Message) -> None:
     """
-    Log broadcast initiation to logger group.
+    Send detailed broadcast information only to the owner's private bot chat.
 
-    Args:
-        message: The original broadcast command message.
-
-    Returns:
-        None
+    The logger group must never receive the owner's ID, name, or the original
+    /broadcast command.
     """
     try:
-        log_message = await app.send_message(
-            chat_id=app.logger,
+        await app.send_message(
+            chat_id=app.owner,
             text=message.lang["gcast_log"].format(
                 message.from_user.id,
                 message.from_user.mention,
                 message.text,
-            )
+            ),
         )
     except errors.FloodWait as fw:
         await asyncio.sleep(fw.value + 1)
-        log_message = await app.send_message(
-            chat_id=app.logger,
+        await app.send_message(
+            chat_id=app.owner,
             text=message.lang["gcast_log"].format(
                 message.from_user.id,
                 message.from_user.mention,
                 message.text,
-            )
+            ),
         )
-
-    try:
-        await log_message.pin(disable_notification=False)
-    except errors.FloodWait as fw:
-        await asyncio.sleep(fw.value + 1)
-        try:
-            await log_message.pin(disable_notification=False)
-        except Exception:
-            pass
 
 
 async def _send_broadcast(
