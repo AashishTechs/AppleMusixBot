@@ -513,7 +513,8 @@ async def update_timer(
                     reply_markup=buttons.controls(
                         chat_id=chat_id,
                         timer=timer_text,
-                        remove=remove
+                        remove=remove,
+                        autoplay=await db.get_autoplay(chat_id),
                     ),
                 )
 
