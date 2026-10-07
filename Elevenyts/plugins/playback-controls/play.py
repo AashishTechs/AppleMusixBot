@@ -544,6 +544,11 @@ async def play_hndlr(
 
     try:
 
+        logger.info(
+            f"▶️ Starting tune.play_media for chat={chat_id} "
+            f"track={file.id} has_stream={bool(file.file_path)}"
+        )
+
         await tune.play_media(
             chat_id=chat_id,
             message=sent,
@@ -553,6 +558,11 @@ async def play_hndlr(
                 if chat_id != message_chat_id
                 else None
             ),
+        )
+
+        logger.info(
+            f"✅ tune.play_media returned for chat={chat_id} "
+            f"track={file.id}"
         )
 
         try:
