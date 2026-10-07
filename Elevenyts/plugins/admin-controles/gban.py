@@ -39,11 +39,12 @@ async def _gban(_, m: types.Message):
         if len(m.command) > 1:
             reason = " ".join(m.command[1:])
     
-    # Check if user ID provided
+    # Check if username or user ID was provided.
     elif len(m.command) > 1:
+        target = m.command[1].strip()
         try:
-            user_id = int(m.command[1])
-            user = await app.get_users(user_id)
+            user = await app.get_users(int(target) if target.lstrip("-").isdigit() else target)
+            user_id = user.id
             user_mention = user.mention
             if len(m.command) > 2:
                 reason = " ".join(m.command[2:])
@@ -58,8 +59,8 @@ async def _gban(_, m: types.Message):
             "ᴏʀ ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴜꜱᴇʀ</blockquote>"
         )
     
-    # Don't allow banning sudo users or owner
-    if user_id in app.sudoers:
+    # Never allow the owner or any sudo user to be globally banned.
+    if user_id == app.owner or user_id in app.sudoers:
         return await m.reply_text("<blockquote>❌ Cannot ban sudo users</blockquote>")
     
     # Check if already gbanned
