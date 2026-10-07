@@ -29,6 +29,8 @@ logger = logging.getLogger(__name__)
 @lang.language()
 @can_manage_vc
 async def _stop(_, m: types.Message):
+    logger.info("🎛️ /stop handler triggered in chat=%s user=%s command=%s", m.chat.id, m.from_user.id if m.from_user else None, m.command)
+
     try:
         await m.delete()
     except Exception:
