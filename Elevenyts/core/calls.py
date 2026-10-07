@@ -154,6 +154,13 @@ class TgCall(PyTgCalls):
         """
 
         try:
+            # Use a freshly preloaded URL when available. This removes the
+            # YouTube extraction delay from /skip and automatic next-track play.
+            cached_url = preload.get_cached_url(media.id)
+            if cached_url:
+                media.file_path = cached_url
+                return cached_url
+
             stream_url = await yt.get_stream_url(
                 media.id,
                 is_live=getattr(media, "is_live", False),
@@ -1586,13 +1593,15 @@ class TgCall(PyTgCalls):
                 msg = None
 
                 # --------------------------------------------------
-                # IMPORTANT:
-                # Always refresh the direct URL for the next track.
-                #
-                # YouTube stream URLs are temporary.
+                # Use the preloaded URL when available. If it is missing
+                # or expired, _get_stream_url() generates a fresh one.
                 # --------------------------------------------------
 
-                media.file_path = None
+                cached_url = preload.get_cached_url(media.id)
+                if cached_url:
+                    media.file_path = cached_url
+                else:
+                    media.file_path = None
 
                 stream_url = await self._get_stream_url(
                     media
