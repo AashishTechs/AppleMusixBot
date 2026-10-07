@@ -609,32 +609,14 @@ class TgCall(PyTgCalls):
         )
 
         # ==================================================
-        # Keep an existing voice-chat connection alive.
+        # Start / replace playback.
         #
-        # IMPORTANT:
-        # Do NOT leave and immediately re-join the VC for every
-        # track. Telegram can rate-limit phone.JoinGroupCall and
-        # return FLOOD_WAIT_X. If we are already connected, use
-        # change_stream() so only the media source is replaced.
-        # ==================================================
-
-        call = None
-
-        try:
-            call = await client.get_call(chat_id)
-        except (
-            ConnectionNotFound,
-            exceptions.NotInCallError,
-        ):
-            call = None
-        except Exception as e:
-            logger.debug(
-                f"Could not inspect VC connection for "
-                f"{chat_id}: {e}"
-            )
-
-        # ==================================================
-        # Start / change playback
+        # PyTgCalls.play() already handles both cases:
+        # - no active call -> joins/starts the voice chat
+        # - active call -> replaces the current stream
+        #
+        # Do not call client.get_call()/change_stream() here.
+        # PyTgCalls 2.x does not expose get_call() on PyTgCalls.
         # ==================================================
 
         max_retries = 3
@@ -643,112 +625,95 @@ class TgCall(PyTgCalls):
         try:
             for attempt in range(max_retries):
                 try:
-                    if call:
-                        logger.info(
-                            f"Changing stream in existing VC for {chat_id}"
-                        )
-                        await client.change_stream(
-                            chat_id=chat_id,
-                            stream=stream,
-                            config=types.GroupCallConfig(auto_start=True),
-                        )
-                    else:
-                        logger.info(
-                            f"Starting VC playback for {chat_id} "
-                            f"(stream={media.id})"
-                        )
-                        await client.play(
-                            chat_id=chat_id,
-                            stream=stream,
-                            config=types.GroupCallConfig(auto_start=True),
-                        )
+                    logger.info(
+                        f"Starting/replacing VC playback for {chat_id} "
+                        f"(track={media.id})"
+                    )
 
-                    # PyTgCalls can return before Telegram has finished
-                    # attaching the stream. Verify the call actually exists
-                    # before marking the track as playing.
-                    active_call = None
-                    for verify_attempt in range(5):
-                        try:
-                            active_call = await client.get_call(chat_id)
-                            if active_call:
-                                break
-                        except (
-                            ConnectionNotFound,
-                            exceptions.NotInCallError,
-                        ):
-                            pass
-
-                        await asyncio.sleep(1)
-
-                    if not active_call:
-                        raise RuntimeError(
-                            f"PyTgCalls returned without an active voice call "
-                            f"for {chat_id}"
-                        )
+                    await client.play(
+                        chat_id=chat_id,
+                        stream=stream,
+                        config=types.GroupCallConfig(
+                            auto_start=True
+                        ),
+                    )
 
                     logger.info(
-                        f"VC playback confirmed for {chat_id} "
+                        f"VC playback command accepted for {chat_id} "
                         f"(track={media.id})"
                     )
                     break
 
                 except errors.FloodWait as fw:
-                    wait_time = int(getattr(fw, "value", 5)) + 1
+                    wait_time = int(
+                        getattr(fw, "value", 5)
+                    ) + 1
+
                     logger.warning(
                         f"Telegram FloodWait while starting playback "
                         f"in {chat_id}: waiting {wait_time}s"
                     )
+
                     if attempt >= max_retries - 1:
                         raise
+
                     await asyncio.sleep(wait_time)
-                    call = None
 
                 except exceptions.NoActiveGroupCall:
                     if attempt >= max_retries - 1:
                         raise
+
                     logger.debug(
                         f"VC is transitioning for {chat_id}, "
                         f"retrying in {retry_delay}s "
                         f"(attempt {attempt + 1}/{max_retries})"
                     )
+
                     await asyncio.sleep(retry_delay)
-                    call = None
 
                 except errors.RPCError as e:
                     error_msg = str(e)
+
                     if "GROUPCALL" in error_msg:
                         if attempt >= max_retries - 1:
                             raise
+
                         logger.debug(
                             f"Group call error for {chat_id}, "
                             f"retrying in {retry_delay}s "
                             f"(attempt {attempt + 1}/{max_retries})"
                         )
+
                         await asyncio.sleep(retry_delay)
-                        call = None
                     else:
                         raise
 
                 except Exception as e:
                     logger.error(
-                        f"PyTgCalls playback attempt {attempt + 1}/"
-                        f"{max_retries} failed for {chat_id}: {e}",
+                        f"PyTgCalls playback attempt "
+                        f"{attempt + 1}/{max_retries} failed "
+                        f"for {chat_id}: {e}",
                         exc_info=True,
                     )
+
                     error_msg = str(e).lower()
+
                     if (
-                        "cannot be initialized more than once" in error_msg
+                        "cannot be initialized more than once"
+                        in error_msg
                         or "connection" in error_msg
                     ):
                         if attempt >= max_retries - 1:
                             raise
+
                         logger.debug(
                             f"Connection error for {chat_id}, "
                             f"retrying in {retry_delay}s"
                         )
+
                         await asyncio.sleep(retry_delay)
-                        call = None
                         continue
+
                     raise
 
             # Artwork is not allowed to delay the actual VC start.
