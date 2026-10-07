@@ -17,6 +17,7 @@
 from pyrogram import filters, types
 
 from Elevenyts import tune, app, db, lang, queue
+from Elevenyts.helpers import can_manage_vc
 import logging
 
 
