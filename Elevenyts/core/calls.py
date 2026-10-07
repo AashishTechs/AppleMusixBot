@@ -1373,11 +1373,10 @@ class TgCall(PyTgCalls):
                     chat_id
                 )
 
-                # ==================================================
-                # Loop current track
-                # ==================================================
-
-                if loop_mode == 1:
+                # /loop N means replay the current track N additional
+                # times. Consume one repeat each time play_next() is
+                # triggered by the end of the current stream.
+                if loop_mode > 0:
 
                     media = queue.get_current(
                         chat_id
@@ -1393,11 +1392,18 @@ class TgCall(PyTgCalls):
 
                             msg = await app.send_message(
                                 chat_id=target_chat,
-                                text=_lang["play_again"],
+                                text=_lang.get(
+                                    "play_again",
+                                    "🔁 Replaying current track...",
+                                ),
                             )
 
-                            # Direct URL may have expired.
                             media.file_path = None
+
+                            await db.set_loop(
+                                chat_id,
+                                max(loop_mode - 1, 0),
+                            )
 
                             await self.play_media(
                                 chat_id,
@@ -1417,97 +1423,11 @@ class TgCall(PyTgCalls):
                                 await self.leave_call(
                                     chat_id
                                 )
-
                             except Exception as leave_ex:
-
                                 logger.debug(
                                     f"Could not leave call "
-                                    f"for {chat_id}: "
-                                    f"{leave_ex}"
+                                    f"for {chat_id}: {leave_ex}"
                                 )
-
-                            await db.rm_chat(
-                                chat_id
-                            )
-
-                    return
-
-                # ==================================================
-                # Queue loop mode
-                # ==================================================
-
-                media = queue.get_next(
-                    chat_id
-                )
-
-                if (
-                    not media
-                    and loop_mode == 10
-                ):
-
-                    all_items = queue.get_all(
-                        chat_id
-                    )
-
-                    if all_items:
-
-                        first_track = all_items[0]
-
-                        _lang = await lang.get_lang(
-                            chat_id
-                        )
-
-                        try:
-
-                            msg = await app.send_message(
-                                chat_id=target_chat,
-                                text="🔁 Looping queue...",
-                            )
-
-                            # ------------------------------------------------
-                            # Direct streaming.
-                            #
-                            # NEVER download the track.
-                            # Generate a fresh temporary stream URL.
-                            # ------------------------------------------------
-
-                            first_track.file_path = None
-
-                            stream_url = (
-                                await self._get_stream_url(
-                                    first_track
-                                )
-                            )
-
-                            if not stream_url:
-
-                                logger.error(
-                                    f"Could not get direct "
-                                    f"stream URL for "
-                                    f"{first_track.id}"
-                                )
-
-                                return
-
-                            first_track.message_id = msg.id
-
-                            await self.play_media(
-                                chat_id,
-                                msg,
-                                first_track,
-                                message_chat_id=message_chat_id,
-                            )
-
-                        except errors.ChannelPrivate:
-
-                            logger.warning(
-                                f"Bot removed from "
-                                f"{chat_id}, cleaning up"
-                            )
-
-                            await self.leave_call(
-                                chat_id
-                            )
 
                             await db.rm_chat(
                                 chat_id
