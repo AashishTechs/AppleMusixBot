@@ -94,9 +94,35 @@ class Inline:
                         callback_data=f"controls stop {chat_id}",
                         style=ButtonStyle.DANGER,
                     ),
+                ],
+                [
+                    self.ikb(
+                        text="AUTO PLAY: ON/OFF",
+                        callback_data=f"controls autoplay {chat_id}",
+                        style=ButtonStyle.SUCCESS,
+                    ),
                 ]
             ]
         )
+
+    # ======================================================
+    # AUTO PLAY SETTINGS
+    # ======================================================
+
+    def autoplay_markup(self, chat_id: int, enabled: bool) -> types.InlineKeyboardMarkup:
+        label = "✅ AUTO PLAY: ENABLED" if enabled else "❌ AUTO PLAY: DISABLED"
+        return self.ikm([
+            [self.ikb(
+                text=label,
+                callback_data=f"autoplay toggle {chat_id}",
+                style=ButtonStyle.SUCCESS if enabled else ButtonStyle.DANGER,
+            )],
+            [self.ikb(
+                text="BACK",
+                callback_data=f"autoplay close {chat_id}",
+                style=ButtonStyle.PRIMARY,
+            )],
+        ])
 
     # ======================================================
     # HELP MENU
