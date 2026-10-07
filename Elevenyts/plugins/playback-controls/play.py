@@ -429,12 +429,47 @@ async def play_hndlr(
 
         return
 
+    # ------------------------------------------------------
+    # Start direct stream extraction as early as possible for the
+    # first/forced track. It runs in parallel with non-critical
+    # Telegram logging and queue work, shaving avoidable latency
+    # without changing the playback/error path.
+    # ------------------------------------------------------
+
+    has_call = (
+        False
+        if force
+        else await db.get_call(chat_id)
+    )
+
+    stream_task = None
+
+    if (
+        not file.file_path
+        and (force or not has_call)
+    ):
+        stream_task = asyncio.create_task(
+            get_direct_stream(file)
+        )
+
+    # Playback logging is not part of the VC critical path.
+    # A slow logger should never delay music playback.
     if await db.is_logger():
 
-        await utils.play_log(
-            m,
-            file.title,
-            file.duration,
+        async def _safe_play_log():
+            try:
+                await utils.play_log(
+                    m,
+                    file.title,
+                    file.duration,
+                )
+            except Exception as e:
+                logger.debug(
+                    f"Playback log skipped: {e}"
+                )
+
+        asyncio.create_task(
+            _safe_play_log()
         )
 
     file.user = mention
@@ -453,7 +488,7 @@ async def play_hndlr(
             file,
         )
 
-        if await db.get_call(chat_id):
+        if has_call:
 
             # The searching indicator is a sticker, so it cannot be edited
             # into the queued card. Remove it first and send a fresh message.
@@ -518,7 +553,28 @@ async def play_hndlr(
 
             return
 
-    if not file.file_path:
+    if stream_task:
+
+        stream_url = await stream_task
+
+        if not stream_url:
+            await safe_edit(
+                sent,
+                "<blockquote>"
+                "❌ Failed to get direct stream.\n\n"
+                "Possible reasons:\n"
+                "• YouTube detected bot activity\n"
+                "• Video is region-blocked or private\n"
+                "• Age-restricted content\n"
+                "• YouTube stream is temporarily unavailable\n\n"
+                "Please update cookies in "
+                "`Elevenyts/cookies/` if required."
+                "</blockquote>",
+            )
+
+            return
+
+    elif not file.file_path:
 
         stream_url = await get_direct_stream(
             file
