@@ -59,11 +59,51 @@ async def _skip(_, m: types.Message):
         except (ChatSendPlainForbidden, ChatWriteForbidden):
             return
 
-    # Run the switch synchronously so playback errors are not hidden
-    # inside a fire-and-forget task. play_next() already has its own
-    # per-chat lock, so duplicate skip requests remain protected.
+    # Run the switch synchronously. If another play_next() is already
+    # transitioning the queue, wait briefly and verify that the current
+    # track actually changed instead of silently treating the skip as done.
+    current = None
+    try:
+        from Elevenyts import queue
+        current = queue.get_current(chat_id)
+    except Exception:
+        pass
+
+    current_id = getattr(current, "id", None)
+
     try:
         await tune.play_next(chat_id)
+
+        # play_next() can return immediately when its per-chat lock is busy.
+        # In that case, give the active transition a moment to finish and
+        # retry once if the current track is still unchanged.
+        await asyncio.sleep(0.5)
+
+        try:
+            current_after = queue.get_current(chat_id)
+        except Exception:
+            current_after = None
+
+        after_id = getattr(current_after, "id", None)
+
+        if current_id and after_id == current_id:
+            await asyncio.sleep(1.0)
+
+            try:
+                current_after = queue.get_current(chat_id)
+            except Exception:
+                current_after = None
+
+            after_id = getattr(current_after, "id", None)
+
+            if after_id == current_id:
+                logger.info(
+                    "Retrying play_next for %s because /skip did not "
+                    "advance the current track",
+                    chat_id,
+                )
+                await tune.play_next(chat_id)
+
     except Exception as e:
         logger.error(
             "Skip/play_next failed for %s: %s",
