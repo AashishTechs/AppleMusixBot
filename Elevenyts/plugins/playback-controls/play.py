@@ -280,20 +280,33 @@ async def play_hndlr(
     # Searching indicator
     # ------------------------------------------------------
 
+    # Send the searching indicator, but NEVER abort playback if the
+    # configured sticker is unavailable/invalid. A failed sticker used to
+    # make /play silently stop before search, stream extraction and VC play.
+    sent = None
+
     try:
         sent = await app.send_sticker(
             chat_id=m.chat.id,
             sticker=SEARCHING_STICKER_ID,
         )
-
     except Exception as e:
-        logger.exception(
-            f"Failed to send searching sticker: {e}"
+        logger.warning(
+            f"Searching sticker unavailable in chat {m.chat.id}: {e}"
         )
-        return
 
     if not sent:
-        return
+        try:
+            sent = await app.send_message(
+                chat_id=m.chat.id,
+                text="<blockquote>🔎 <b>Searching...</b></blockquote>",
+            )
+        except Exception as e:
+            logger.error(
+                f"Could not send searching indicator in chat {m.chat.id}: {e}",
+                exc_info=True,
+            )
+            return
 
     mention = m.from_user.mention
 
