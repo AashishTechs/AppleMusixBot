@@ -1489,6 +1489,7 @@ class TgCall(PyTgCalls):
                 # Advance the queue for normal playback completion/skip.
                 # Loop mode above reuses the current track without popping it.
                 # --------------------------------------------------
+                finished_media = queue.get_current(chat_id)
                 media = queue.get_next(chat_id)
 
                 # ==================================================
@@ -1522,6 +1523,44 @@ class TgCall(PyTgCalls):
                 # ==================================================
 
                 if not media:
+
+                    # Auto Play continues from YouTube Mix when the manual queue ends.
+                    if await db.get_autoplay(chat_id) and finished_media:
+                        mix_tracks = await yt.mix(
+                            finished_media.id,
+                            limit=5,
+                            exclude_ids={finished_media.id},
+                        )
+
+                        if mix_tracks:
+                            for track in mix_tracks:
+                                queue.add(chat_id, track)
+
+                            media = queue.get_current(chat_id)
+                            media.file_path = None
+                            _lang = await lang.get_lang(chat_id)
+
+                            try:
+                                msg = await app.send_message(
+                                    chat_id=target_chat,
+                                    text="🔄 <b>Auto Play</b> • Loading a related song...",
+                                )
+                            except Exception:
+                                msg = None
+
+                            try:
+                                await self.play_media(
+                                    chat_id,
+                                    msg,
+                                    media,
+                                    message_chat_id=message_chat_id,
+                                )
+                                return
+                            except Exception as e:
+                                logger.error(
+                                    f"Auto Play playback failed for {chat_id}: {e}",
+                                    exc_info=True,
+                                )
 
                     if config.AUTO_END:
 
