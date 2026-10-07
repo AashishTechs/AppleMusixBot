@@ -1,14 +1,12 @@
 # ==========================================================
-# Copyright (c) 2026 ArtistBots
+# Copyright (c) 2026 Apple Music <<3
 # All Rights Reserved.
 #
-# Project      : ArtistBots API Telegram Music Bot
-# Powered By   : Artist
+# Project      : Apple Music Telegram Music Bot
+# Powered By   : Apple Music <<3
 # Type         : API Based Telegram Music Bot
 #
-# Bot          : @ArtistApibot
-# Channel      : https://t.me/artistbots
-# GitHub       : https://github.com/elevenyts
+# Bot          : @AppleMusix_bot
 #
 # Unauthorized copying, modification, or redistribution
 # of this source code without permission is prohibited.
@@ -28,50 +26,47 @@ async def _loop(_, m: types.Message):
         await m.delete()
     except Exception:
         pass
-    
-    # Check for channel play mode
+
     is_channel = m.command[0].lower() == "cloop"
     chat_id = m.chat.id
-    
+
     if is_channel:
         channel_id = await db.get_cmode(m.chat.id)
         if channel_id is None:
-            return await m.reply_text("Channel play is not enabled. Use /channelplay to enable.")
-        chat_id = channel_id
-    
-    current_loop = await db.get_loop(chat_id)
-    
-    if len(m.command) > 1:
-        mode_arg = m.command[1].lower()
-        if mode_arg in ["0", "disable"]:
-            new_loop = 0
-            text = "Loop mode disabled"
-        elif mode_arg in ["single", "1", "one"]:
-            new_loop = 1
-            text = "Loop mode set to Single Track"
-        elif mode_arg in ["queue", "all", "10"]:
-            new_loop = 10
-            text = "Loop mode set to Queue"
-        else:
             return await m.reply_text(
-                "Usage:\n"
-                "/loop - Cycle through modes\n"
-                "/loop disable - Disable loop\n"
-                "/loop single - Loop current track\n"
-                "/loop queue - Loop entire queue\n\n"
-                "Channel commands:\n"
-                "/cloop - Same as /loop but for channel"
+                "Channel play is not enabled. Use /channelplay to enable."
+            )
+        chat_id = channel_id
+
+    if not await db.get_call(chat_id):
+        return await m.reply_text("Nothing is playing.")
+
+    # /loop [1-10]
+    # The number means how many additional times the current track
+    # should be replayed. /loop 0 disables looping.
+    if len(m.command) > 1:
+        try:
+            repeats = int(m.command[1])
+        except ValueError:
+            return await m.reply_text(
+                "Usage: /loop [1-10]\n"
+                "Use /loop 0 to disable looping."
+            )
+
+        if repeats < 0 or repeats > 10:
+            return await m.reply_text(
+                "Loop count must be between 0 and 10."
             )
     else:
-        if current_loop == 0:
-            new_loop = 1
-            text = "Loop mode set to Single Track"
-        elif current_loop == 1:
-            new_loop = 10
-            text = "Loop mode set to Queue"
-        else:
-            new_loop = 0
-            text = "Loop mode disabled"
-    
-    await db.set_loop(chat_id, new_loop)
+        repeats = 1
+
+    await db.set_loop(chat_id, repeats)
+
+    if repeats == 0:
+        text = "🔁 Loop disabled."
+    elif repeats == 1:
+        text = "🔁 Current track will repeat 1 more time."
+    else:
+        text = f"🔁 Current track will repeat {repeats} more times."
+
     await m.reply_text(text)
