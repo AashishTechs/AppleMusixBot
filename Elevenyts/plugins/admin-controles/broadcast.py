@@ -215,19 +215,17 @@ def _parse_broadcast_command(text: str) -> Tuple[List[str], str]:
 
     remaining_text = parts[1]
 
-    # Extract flags (words starting with '-') from the beginning
+    # Extract flags from the beginning. Support both --flag and -flag.
     flags = []
     lines = remaining_text.split('\n')
     first_line_parts = lines[0].split()
 
-    # Collect flags only from first line
     message_start_index = 0
     for i, part in enumerate(first_line_parts):
-        if part.startswith('-'):
-            flags.append(part)
+        if part.startswith("--") or part.startswith("-"):
+            flags.append("-" + part.lstrip("-").lower())
             message_start_index = i + 1
         else:
-            # Stop collecting flags once we hit non-flag text
             break
 
     # Reconstruct message preserving all newlines and formatting
@@ -259,13 +257,11 @@ async def _get_broadcast_recipients(flags: List[str]) -> Tuple[List[int], List[i
     groups = []
     users = []
 
-    # Include groups unless -nochat flag is present
-    if "-nochat" not in flags:
-        groups = await db.get_chats()
-
-    # Include users if -user flag is present
+    # --user means user-only broadcast. Without it, broadcast to served groups.
     if "-user" in flags:
         users = await db.get_users()
+    elif "-nochat" not in flags:
+        groups = await db.get_chats()
 
     return groups, users
 
@@ -357,6 +353,17 @@ async def _send_broadcast(
                 )
             except:
                 pass
+
+        # --nobot skips bot accounts in user broadcasts.
+        if chat_id in users and "-nobot" in flags:
+            try:
+                recipient = await app.get_users(chat_id)
+                if getattr(recipient, "is_bot", False):
+                    failed_log += f"{chat_id} - Skipped (bot user)\\n"
+                    continue
+            except Exception:
+                failed_log += f"{chat_id} - Skipped (unresolvable user)\\n"
+                continue
 
         # Attempt to send message
         try:
