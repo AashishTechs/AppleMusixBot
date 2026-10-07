@@ -726,7 +726,10 @@ class YouTube:
                 asyncio.to_thread(
                     _extract
                 ),
-                timeout=12
+                # YouTube/Deno extraction can legitimately take 10-20s,
+                # especially for the next queued track. Do not abort a
+                # valid extraction just because it crosses the old 12s limit.
+                timeout=35
             )
 
             elapsed = time.monotonic() - started_at
