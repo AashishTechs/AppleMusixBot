@@ -23,10 +23,12 @@ from pytgcalls import __version__ as pytgver
 
 from Elevenyts import app, config, db, lang, userbot
 from Elevenyts.plugins import all_modules
+from Elevenyts.helpers import can_manage_vc
 
 
 @app.on_message(filters.command(["stats"]) & ~app.bl_users)
 @lang.language()
+@can_manage_vc
 async def _stats(_, m: types.Message):
     # Auto-delete command message
     try:
