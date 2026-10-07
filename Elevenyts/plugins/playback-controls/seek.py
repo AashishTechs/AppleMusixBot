@@ -32,11 +32,25 @@ async def _seek(_, m: types.Message):
     if len(m.command) < 2:
         return await m.reply_text(f"Usage: {m.command[0]} <seconds>")
 
+    raw_time = m.command[1].strip().lower()
+
+    # Accept seconds as well as MM:SS / HH:MM:SS.
     try:
-        to_seek = int(m.command[1])
+        if ":" in raw_time:
+            parts = [int(part) for part in raw_time.split(":")]
+            if len(parts) == 2:
+                to_seek = parts[0] * 60 + parts[1]
+            elif len(parts) == 3:
+                to_seek = parts[0] * 3600 + parts[1] * 60 + parts[2]
+            else:
+                raise ValueError
+        else:
+            to_seek = int(raw_time)
     except ValueError:
-        return await m.reply_text(f"Usage: {m.command[0]} <seconds>")
-    
+        return await m.reply_text(
+            f"Usage: {m.command[0]} <seconds|MM:SS>"
+        )
+
     if to_seek < 10:
         return await m.reply_text("Minimum seek is 10 seconds")
 
@@ -62,7 +76,7 @@ async def _seek(_, m: types.Message):
 
     sent = await m.reply_text("Seeking...")
     
-    current_time = getattr(media, 'time', 0)
+    current_time = await tune.current_time(chat_id)
     if m.command[0] in ["seekback", "cseekback"]:
         stype = "backward"
         start_from = max(1, current_time - to_seek)
