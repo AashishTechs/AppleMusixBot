@@ -66,16 +66,10 @@ class YouTube:
         )
 
         # ======================================================
-        # SEARCH / STREAM CACHE
+        # SEARCH CACHE
         # ======================================================
 
         self.search_cache = {}
-
-        # Direct YouTube media URLs are temporary. Keep them only
-        # briefly so repeated /play requests do not run yt-dlp again.
-        # Live streams are never cached because their URLs can change.
-        self.stream_cache = {}
-        self.stream_cache_ttl = 45.0
 
         # Kept for compatibility with old download code.
         self._download_semaphore = asyncio.Semaphore(5)
@@ -575,23 +569,6 @@ class YouTube:
 
             return None
 
-        # ------------------------------------------------------
-        # Short-lived direct URL cache.
-        # This is intentionally skipped for live streams.
-        # ------------------------------------------------------
-        cache_key = (video_id, bool(video))
-
-        if not is_live:
-            cached = self.stream_cache.get(cache_key)
-            if cached:
-                cached_url, cached_at = cached
-                if time.monotonic() - cached_at < self.stream_cache_ttl:
-                    logger.debug(
-                        f"⚡ Stream URL cache hit for {video_id}"
-                    )
-                    return cached_url
-                self.stream_cache.pop(cache_key, None)
-
         url = self.base + video_id
 
         cookie = self.get_cookies()
@@ -755,21 +732,6 @@ class YouTube:
             elapsed = time.monotonic() - started_at
 
             if stream_url:
-
-                # Cache only normal tracks. Direct YouTube URLs expire,
-                # so this cache is deliberately short-lived.
-                if not is_live:
-                    self.stream_cache[cache_key] = (
-                        stream_url,
-                        time.monotonic(),
-                    )
-
-                    if len(self.stream_cache) > 100:
-                        oldest_key = min(
-                            self.stream_cache,
-                            key=lambda key: self.stream_cache[key][1],
-                        )
-                        self.stream_cache.pop(oldest_key, None)
 
                 logger.info(
                     f"Direct stream URL extracted: "
