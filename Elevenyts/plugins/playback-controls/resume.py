@@ -36,7 +36,7 @@ async def _resume(_, m: types.Message):
         pass
     
     # Check for channel play mode
-    is_channel = m.command[0].lower() == "cresume"
+    is_channel = m.command[0].lower().split("@", 1)[0] == "cresume"
     chat_id = m.chat.id
     
     if is_channel:
