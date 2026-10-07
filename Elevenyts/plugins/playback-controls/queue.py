@@ -73,7 +73,7 @@ async def _queue_func(_, m: types.Message):
     caption = (
         "<blockquote>🎧 <b>APPLE MUSIX ‹‹𝟹</b></blockquote>\n"
         f"<blockquote>🎵 <b>NOW PLAYING :</b> "
-        f"<a href="{current.url}">{current.title}</a></blockquote>\n"
+        f"<a href=\"{current.url}\">{current.title}</a></blockquote>\n"
         f"<blockquote>⏱️ <b>LENGTH :</b> {current.duration} MIN</blockquote>\n"
         f"<blockquote>👤 <b>USER :</b> {current.user}</blockquote>"
     )
