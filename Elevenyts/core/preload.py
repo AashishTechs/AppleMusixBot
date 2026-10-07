@@ -141,28 +141,6 @@ class PreloadManager:
     def is_preloading(self, track_id: str) -> bool:
         return track_id in self._preloading
 
-    async def wait_for_cached_url(
-        self,
-        track_id: str,
-        timeout: float = 40.0,
-    ) -> str | None:
-        """Wait for an active preload before starting another extraction."""
-        if not self.is_preloading(track_id):
-            return self.get_cached_url(track_id)
-
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            cached_url = self.get_cached_url(track_id)
-            if cached_url:
-                return cached_url
-
-            if not self.is_preloading(track_id):
-                return self.get_cached_url(track_id)
-
-            await asyncio.sleep(0.25)
-
-        return self.get_cached_url(track_id)
-
     def clear(self):
         self._preloading.clear()
         self.tasks.clear()
