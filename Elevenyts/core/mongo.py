@@ -238,7 +238,8 @@ class MongoDB:
 
     async def del_blacklist(self, chat_id: int) -> None:
         if str(chat_id).startswith("-"):
-            self.blacklisted.remove(chat_id)
+            if chat_id in self.blacklisted:
+                self.blacklisted.remove(chat_id)
             return await self.cache.update_one(
                 {"_id": "bl_chats"},
                 {"$pull": {"chat_ids": chat_id}},
