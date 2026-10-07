@@ -13,10 +13,13 @@
 # ==========================================================
 
 import asyncio
+import logging
 
 from pyrogram import enums, errors, types
 
 from Elevenyts import app, config, db, queue, yt
+
+logger = logging.getLogger(__name__)
 
 
 def checkUB(play):
@@ -80,6 +83,19 @@ def checkUB(play):
 
         if m.chat.id not in db.active_calls:
             client = await db.get_client(m.chat.id)
+
+            if client is None:
+                logger.error(
+                    "No active assistant client available for chat %s",
+                    m.chat.id,
+                )
+                await safe_reply(
+                    "<blockquote>❌ <b>Assistant unavailable.</b>\n\n"
+                    "No music assistant is currently connected. "
+                    "Please try again in a few seconds.</blockquote>"
+                )
+                return
+
             try:
                 member = await app.get_chat_member(m.chat.id, client.id)
                 if member.status in [
@@ -224,6 +240,20 @@ def checkUB(play):
         except:
             pass
 
-        return await play(_, m, force, url, cplay, video)
+        try:
+            return await play(_, m, force, url, cplay, video)
+        except Exception as e:
+            logger.error(
+                "Unhandled /play wrapper error in chat %s: %s",
+                getattr(getattr(m, "chat", None), "id", None),
+                e,
+                exc_info=True,
+            )
+            await safe_reply(
+                "<blockquote>❌ <b>Playback failed.</b>\n\n"
+                "An internal playback error occurred. "
+                "Please try the command again.</blockquote>"
+            )
+            return
 
     return wrapper
