@@ -912,12 +912,14 @@ class TgCall(PyTgCalls):
                     keyboard = buttons.controls(
                         chat_id,
                         timer=timer_text,
+                        autoplay=await db.get_autoplay(chat_id),
                     )
 
                 else:
 
                     keyboard = buttons.controls(
-                        chat_id
+                        chat_id,
+                        autoplay=await db.get_autoplay(chat_id),
                     )
 
                 # ------------------------------------------------
