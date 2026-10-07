@@ -14,6 +14,7 @@
 
 import asyncio
 import logging
+import time
 
 from ntgcalls import ConnectionNotFound, TelegramServerError
 from pyrogram import enums, errors
@@ -67,9 +68,43 @@ class TgCall(PyTgCalls):
         # Prevent duplicate StreamEnded events.
         self._stream_end_cache = {}
 
+        # Monotonic timestamps used to keep Media.time accurate while
+        # playback is running. This makes /seekback use the real position.
+        self._playback_started_at = {}
+
     # ======================================================
     # Telegram message helpers
     # ======================================================
+
+    # ======================================================
+    # Playback timing helpers
+    # ======================================================
+
+    async def _sync_playback_time(self, chat_id: int):
+        media = queue.get_current(chat_id)
+        if not media:
+            return 0
+
+        started_at = self._playback_started_at.get(chat_id)
+        if started_at is None:
+            return max(0, int(getattr(media, "time", 0)))
+
+        elapsed = max(0, int(time.monotonic() - started_at))
+        if elapsed:
+            current = int(getattr(media, "time", 0)) + elapsed
+            if getattr(media, "duration_sec", 0):
+                current = min(current, max(0, media.duration_sec))
+            media.time = current
+            self._playback_started_at[chat_id] = time.monotonic()
+
+        return max(0, int(getattr(media, "time", 0)))
+
+    async def current_time(self, chat_id: int) -> int:
+        if await db.playing(chat_id):
+            return await self._sync_playback_time(chat_id)
+        media = queue.get_current(chat_id)
+        return max(0, int(getattr(media, "time", 0))) if media else 0
+
 
     async def _edit_media_with_retry(
         self,
@@ -192,12 +227,14 @@ class TgCall(PyTgCalls):
         client = await db.get_assistant(chat_id)
 
         try:
+            await self._sync_playback_time(chat_id)
             await client.pause(chat_id)
 
             await db.playing(
                 chat_id,
                 paused=True,
             )
+            self._playback_started_at.pop(chat_id, None)
 
             return True
 
@@ -209,6 +246,7 @@ class TgCall(PyTgCalls):
                 chat_id,
                 paused=False,
             )
+            self._playback_started_at.pop(chat_id, None)
 
             await db.remove_call(chat_id)
 
@@ -247,6 +285,7 @@ class TgCall(PyTgCalls):
                 chat_id,
                 paused=False,
             )
+            self._playback_started_at[chat_id] = time.monotonic()
 
             return True
 
@@ -294,6 +333,8 @@ class TgCall(PyTgCalls):
             )
 
         # Clear queue and database state.
+        self._playback_started_at.pop(chat_id, None)
+
         try:
             queue.clear(chat_id)
             await db.remove_call(chat_id)
@@ -758,6 +799,8 @@ class TgCall(PyTgCalls):
                 media.time = seek_time
             else:
                 media.time = 1
+
+            self._playback_started_at[chat_id] = time.monotonic()
 
             # ==================================================
             # Send playback UI
