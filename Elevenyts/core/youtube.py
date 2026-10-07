@@ -1427,6 +1427,98 @@ class YouTube:
         return None
 
     # ==========================================================
+    # YOUTUBE MIX / AUTO PLAY
+    # ==========================================================
+
+    async def mix(
+        self,
+        video_id: str,
+        limit: int = 5,
+        exclude_ids: set[str] | None = None,
+    ) -> list[Track]:
+        """Fetch related tracks from YouTube's Mix queue."""
+        if not video_id:
+            return []
+
+        exclude = set(exclude_ids or ())
+        exclude.add(video_id)
+        mix_url = f"https://www.youtube.com/watch?v={video_id}&list=RD{video_id}"
+        cookie = self.get_cookies()
+        options = self._get_ydl_opts()
+        options.update({
+            "extract_flat": True,
+            "skip_download": True,
+            "noplaylist": False,
+            "playlistend": max(1, int(limit) + 4),
+        })
+        if cookie:
+            options["cookiefile"] = cookie
+
+        def _extract():
+            try:
+                with yt_dlp.YoutubeDL(options) as ydl:
+                    return ydl.extract_info(mix_url, download=False)
+            except Exception as e:
+                logger.warning(f"YouTube Mix extraction failed for {video_id}: {e}")
+                return None
+
+        try:
+            info = await asyncio.wait_for(
+                asyncio.to_thread(_extract),
+                timeout=25,
+            )
+        except Exception as e:
+            logger.warning(f"YouTube Mix lookup failed for {video_id}: {e}")
+            return []
+
+        if not info:
+            return []
+
+        tracks = []
+        for data in info.get("entries") or []:
+            if not data:
+                continue
+            item_id = data.get("id")
+            if not item_id or item_id in exclude:
+                continue
+
+            duration_sec = data.get("duration")
+            try:
+                duration_sec = int(duration_sec or 0)
+            except (TypeError, ValueError):
+                duration_sec = 0
+            if duration_sec <= 0 or duration_sec > config.DURATION_LIMIT:
+                continue
+
+            thumbnails = data.get("thumbnails") or []
+            thumbnail = thumbnails[-1].get("url", "").split("?")[0] if thumbnails else ""
+            duration = utils.format_duration(duration_sec)
+            title = (data.get("title") or "Unknown").strip()[:25]
+            url = data.get("webpage_url") or data.get("url") or (self.base + item_id)
+
+            tracks.append(Track(
+                id=item_id,
+                channel_name=data.get("channel") or data.get("uploader"),
+                duration=duration,
+                duration_sec=duration_sec,
+                title=title,
+                url=url,
+                thumbnail=thumbnail,
+                file_path=None,
+                message_id=0,
+                time=0,
+                user="Auto Play",
+                is_live=False,
+                video=False,
+            ))
+
+            exclude.add(item_id)
+            if len(tracks) >= limit:
+                break
+
+        return tracks
+
+    # ==========================================================
     # PLAYLIST
     # ==========================================================
 
