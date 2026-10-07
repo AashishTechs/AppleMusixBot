@@ -180,6 +180,13 @@ async def play_hndlr(
     except Exception:
         pass
 
+    # Resolve the actual sub-command from Telegram. Pyrogram does not
+    # pass /cplay, /vplay or *force as Python keyword arguments automatically.
+    command_name = m.command[0].lower().split("@", 1)[0]
+    force = command_name.endswith("force")
+    cplay = command_name.startswith("c")
+    video = command_name.startswith("v") or command_name.startswith("cv")
+
     chat_id = m.chat.id
     message_chat_id = m.chat.id
 
