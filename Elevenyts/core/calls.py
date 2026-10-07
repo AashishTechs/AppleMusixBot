@@ -156,10 +156,7 @@ class TgCall(PyTgCalls):
         try:
             # Use a freshly preloaded URL when available. This removes the
             # YouTube extraction delay from /skip and automatic next-track play.
-            cached_url = await preload.wait_for_cached_url(
-                media.id,
-                timeout=40.0,
-            )
+            cached_url = preload.get_cached_url(media.id)
             if cached_url:
                 media.file_path = cached_url
                 return cached_url
