@@ -339,6 +339,7 @@ class TgCall(PyTgCalls):
         try:
             queue.clear(chat_id)
             await db.remove_call(chat_id)
+            await db.set_loop(chat_id, 0)
 
         except Exception as e:
             logger.warning(
