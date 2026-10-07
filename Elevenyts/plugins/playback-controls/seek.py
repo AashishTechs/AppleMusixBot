@@ -31,8 +31,10 @@ async def _seek(_, m: types.Message):
     except Exception:
         pass
     
+    command_name = m.command[0].lower().split("@", 1)[0]
+
     if len(m.command) < 2:
-        return await m.reply_text(f"Usage: {m.command[0]} <seconds>")
+        return await m.reply_text(f"Usage: {command_name} <seconds>")
 
     raw_time = m.command[1].strip().lower()
 
@@ -50,14 +52,14 @@ async def _seek(_, m: types.Message):
             to_seek = int(raw_time)
     except ValueError:
         return await m.reply_text(
-            f"Usage: {m.command[0]} <seconds|MM:SS>"
+            f"Usage: {command_name} <seconds|MM:SS>"
         )
 
     if to_seek < 10:
         return await m.reply_text("Minimum seek is 10 seconds")
 
     # Check for channel play mode
-    is_channel = m.command[0].lower() in ["cseek", "cseekback"]
+    is_channel = command_name in {"cseek", "cseekback"}
     chat_id = m.chat.id
     
     if is_channel:
@@ -79,12 +81,19 @@ async def _seek(_, m: types.Message):
     sent = await m.reply_text("Seeking...")
     
     current_time = await tune.current_time(chat_id)
-    if m.command[0] in ["seekback", "cseekback"]:
+    command_name = m.command[0].lower().split("@", 1)[0]
+
+    if command_name in {"seekback", "cseekback"}:
         stype = "backward"
         start_from = max(1, current_time - to_seek)
     else:
         stype = "forward"
-        start_from = min(current_time + to_seek, media.duration_sec - 5)
+        start_from = min(current_time + to_seek, max(1, media.duration_sec - 5))
+
+    logging.getLogger(__name__).info(
+        "🎯 Seek request chat=%s command=%s current=%s offset=%s target=%s",
+        chat_id, command_name, current_time, to_seek, start_from,
+    )
 
     success = await tune.seek_stream(chat_id, int(start_from))
     
