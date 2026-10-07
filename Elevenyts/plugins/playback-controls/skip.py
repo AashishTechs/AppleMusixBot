@@ -72,7 +72,7 @@ async def _skip(_, m: types.Message):
     current_id = getattr(current, "id", None)
 
     try:
-        await tune.play_next(chat_id)
+        await tune.play_next(chat_id, force_skip=True)
 
         # play_next() can return immediately when its per-chat lock is busy.
         # In that case, give the active transition a moment to finish and
