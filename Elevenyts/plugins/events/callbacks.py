@@ -199,6 +199,20 @@ async def _controls(_, query: types.CallbackQuery):
         )
 
     # ------------------------------------------------------
+    # AUTO PLAY
+    # ------------------------------------------------------
+
+    if action == "autoplay":
+        enabled = not await db.get_autoplay(chat_id)
+        await db.set_autoplay(chat_id, enabled)
+        return await query.edit_message_reply_markup(
+            reply_markup=buttons.controls(
+                chat_id,
+                autoplay=enabled,
+            )
+        )
+
+    # ------------------------------------------------------
     # STATUS
     # ------------------------------------------------------
 
