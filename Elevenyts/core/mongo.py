@@ -60,6 +60,7 @@ class MongoDB:
         self.active_calls = {}
         # Telegram video-chat sessions currently observed by the bot.
         self.active_video_chats = set()
+        self.vc_logger = False
         self.blacklisted = []
         self.notified = []
         self.cache = self.db.cache
