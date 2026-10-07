@@ -19,7 +19,7 @@ from typing import List, Tuple
 
 from pyrogram import enums, errors, filters, types
 
-from Elevenyts import app, db, lang
+from Elevenyts import app, db, lang, logger
 
 
 # Global flag to track if a broadcast is currently running
@@ -27,7 +27,6 @@ broadcasting: bool = False
 
 
 @app.on_message(filters.command(["broadcast"]))
-@lang.language()
 async def broadcast_message(_, message: types.Message) -> None:
     """
     Broadcast a message to all groups and/or users.
@@ -44,9 +43,12 @@ async def broadcast_message(_, message: types.Message) -> None:
     Returns:
         None
     """
-    # Keep the command handler visible to everyone, but allow execution only
-    # for the configured owner. This avoids silent failures when the owner
-    # filter is stale while the bot is running with a changed OWNER_ID.
+    # Keep this handler independent from the language decorator. The old
+    # decorator could stop the command before the owner check when its
+    # callback argument could not be resolved or the chat was blacklisted.
+    message.lang = lang.languages["en"]
+    logger.info("📣 /broadcast received from user=%s chat=%s", getattr(message.from_user, "id", None), message.chat.id)
+
     if not message.from_user or message.from_user.id != app.owner:
         return await message.reply_text("❌ This command is owner-only.")
 
@@ -87,26 +89,32 @@ async def broadcast_message(_, message: types.Message) -> None:
             "❌ No recipients found. Make sure the bot is added to groups or has users."
         )
 
-    # Set broadcasting flag
+    # Set broadcasting flag before any long-running work.
     broadcasting = True
-    sent = await message.reply_text(message.lang["gcast_start"])
+    try:
+        sent = await message.reply_text(message.lang["gcast_start"])
 
-    # Log broadcast initiation
-    await _log_broadcast_start(message)
-    await asyncio.sleep(5)
+        # Log broadcast initiation
+        await _log_broadcast_start(message)
+        await asyncio.sleep(1)
 
-    # Perform the broadcast (supports text and media messages)
-    success_groups, success_users, failed_chats = await _send_broadcast(
-        broadcast_text, groups, users, sent, media_message, flags, message.lang, media_group
-    )
+        # Perform the broadcast (supports text and media messages)
+        success_groups, success_users, failed_chats = await _send_broadcast(
+            broadcast_text, groups, users, sent, media_message, flags, message.lang, media_group
+        )
 
-    # Reset broadcasting flag
-    broadcasting = False
-
-    # Send completion message
-    await _send_broadcast_completion(
-        message, sent, success_groups, success_users, failed_chats, media_message
-    )
+        # Send completion message
+        await _send_broadcast_completion(
+            message, sent, success_groups, success_users, failed_chats, media_message
+        )
+    except Exception as ex:
+        logger.error("❌ Broadcast handler failed: %s", ex, exc_info=True)
+        try:
+            await message.reply_text(f"❌ Broadcast failed: <code>{type(ex).__name__}: {ex}</code>")
+        except Exception:
+            pass
+    finally:
+        broadcasting = False
 
 
 @app.on_message(filters.command(["stop_gcast", "stop_broadcast"]))
