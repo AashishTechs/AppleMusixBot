@@ -36,10 +36,8 @@ async def _stats(_, m: types.Message):
     except Exception:
         pass
     
-    # Check if user is sudo
-    if m.from_user.id not in app.sudoers:
-        return
-    
+    # Access is controlled by @can_manage_vc:
+    # sudo users, authorized users, and group admins can use /stats.
     sent = await m.reply_photo(
         photo=config.PING_IMG,
         caption=m.lang["stats_fetching"],
