@@ -1344,6 +1344,7 @@ class TgCall(PyTgCalls):
     async def play_next(
         self,
         chat_id: int,
+        force_skip: bool = False,
     ) -> None:
 
         if chat_id not in self._play_next_locks:
@@ -1417,10 +1418,14 @@ class TgCall(PyTgCalls):
                     chat_id
                 )
 
+                if force_skip and loop_mode:
+                    await db.set_loop(chat_id, 0)
+                    loop_mode = 0
+
                 # /loop N means replay the current track N additional
                 # times. Consume one repeat each time play_next() is
                 # triggered by the end of the current stream.
-                if loop_mode > 0:
+                if loop_mode > 0 and not force_skip:
 
                     media = queue.get_current(
                         chat_id
