@@ -468,6 +468,20 @@ class MongoDB:
             upsert=True,
         )
 
+    # AUTO PLAY METHODS
+    async def get_autoplay(self, chat_id: int) -> bool:
+        """Get Auto Play status for a chat. Default is disabled."""
+        doc = await self.cache.find_one({"_id": f"autoplay_{chat_id}"})
+        return bool(doc.get("enabled", False)) if doc else False
+
+    async def set_autoplay(self, chat_id: int, enabled: bool) -> None:
+        """Enable or disable Auto Play for a chat."""
+        await self.cache.update_one(
+            {"_id": f"autoplay_{chat_id}"},
+            {"$set": {"enabled": bool(enabled)}},
+            upsert=True,
+        )
+
     # LOOP MODE METHODS
     async def get_loop(self, chat_id: int) -> int:
         """Get loop mode for a chat. 0=off, 1=single, 10=queue"""
