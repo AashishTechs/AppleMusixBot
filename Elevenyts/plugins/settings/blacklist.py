@@ -148,18 +148,17 @@ async def _block_user(_, m: types.Message):
         user_id = m.reply_to_message.from_user.id
         user_mention = m.reply_to_message.from_user.mention
     elif len(m.command) > 1:
+        target = m.command[1].strip()
         try:
-            user_id = int(m.command[1])
-            user = await app.get_users(user_id)
+            user = await app.get_users(target)
+            user_id = user.id
             user_mention = user.mention
-        except ValueError:
-            return await m.reply_text("<blockquote>❌ Invalid user ID</blockquote>")
         except Exception:
-            return await m.reply_text("<blockquote>❌ User not found</blockquote>")
+            return await m.reply_text("<blockquote>❌ User not found. Use a valid username or user ID.</blockquote>")
     else:
         return await m.reply_text(
             "<blockquote><b>ᴜꜱᴀɢᴇ:</b>\n"
-            "<code>/block [user_id]</code>\n"
+            "<code>/block [username/user_id]</code>\n"
             "ᴏʀ ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴜꜱᴇʀ</blockquote>"
         )
     
@@ -172,8 +171,8 @@ async def _block_user(_, m: types.Message):
             f"<blockquote>⚠️ {user_mention} is already blocked</blockquote>"
         )
 
-    app.bl_users.add(user_id)
     await db.add_blacklist(user_id)
+    app.bl_users.update({user_id})
     await m.reply_text(
         f"<blockquote><u><b>✅ ᴜꜱᴇʀ ʙʟᴏᴄᴋᴇᴅ</b></u>\n\n"
         f"<b>ᴜꜱᴇʀ:</b> {user_mention}\n"
@@ -198,18 +197,21 @@ async def _unblock_user(_, m: types.Message):
         user_id = m.reply_to_message.from_user.id
         user_mention = m.reply_to_message.from_user.mention
     elif len(m.command) > 1:
+        target = m.command[1].strip()
         try:
-            user_id = int(m.command[1])
-            user = await app.get_users(user_id)
+            user = await app.get_users(target)
+            user_id = user.id
             user_mention = user.mention
-        except ValueError:
-            return await m.reply_text("<blockquote>❌ Invalid user ID</blockquote>")
         except Exception:
-            user_mention = f"User {user_id}"
+            try:
+                user_id = int(target)
+                user_mention = f"User {user_id}"
+            except ValueError:
+                return await m.reply_text("<blockquote>❌ User not found. Use a valid username or user ID.</blockquote>")
     else:
         return await m.reply_text(
             "<blockquote><b>ᴜꜱᴀɢᴇ:</b>\n"
-            "<code>/unblock [user_id]</code>\n"
+            "<code>/unblock [username/user_id]</code>\n"
             "ᴏʀ ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴜꜱᴇʀ</blockquote>"
         )
     
@@ -218,8 +220,14 @@ async def _unblock_user(_, m: types.Message):
             f"<blockquote>⚠️ {user_mention} is not blocked</blockquote>"
         )
 
-    app.bl_users.discard(user_id)
     await db.del_blacklist(user_id)
+    if hasattr(app.bl_users, "users"):
+        app.bl_users.users.discard(user_id)
+    elif hasattr(app.bl_users, "remove"):
+        try:
+            app.bl_users.remove(user_id)
+        except (KeyError, ValueError):
+            pass
     await m.reply_text(
         f"<blockquote><u><b>✅ ᴜꜱᴇʀ ᴜɴʙʟᴏᴄᴋᴇᴅ</b></u>\n\n"
         f"<b>ᴜꜱᴇʀ:</b> {user_mention}\n"
