@@ -19,7 +19,7 @@ from pyrogram import filters, types
 from pyrogram.errors import ChatSendPlainForbidden, ChatWriteForbidden
 
 from Elevenyts import tune, app, db, lang
-from Elevenyts.helpers import buttons, can_manage_vc
+from Elevenyts.helpers import can_manage_vc
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +66,7 @@ async def _resume(_, m: types.Message):
 
     try:
         await m.reply_text(
-            f"Resumed by {m.from_user.mention}",
-            reply_markup=buttons.controls(chat_id),
+            f"Resumed by {m.from_user.mention}"
         )
     except (ChatSendPlainForbidden, ChatWriteForbidden):
         logger.warning("Cannot send text in media-only chat")
