@@ -28,6 +28,8 @@ logger = logging.getLogger(__name__)
 @lang.language()
 @can_manage_vc
 async def _resume(_, m: types.Message):
+    logger.info("🎛️ /resume handler triggered in chat=%s user=%s", m.chat.id, m.from_user.id if m.from_user else None)
+
     try:
         await m.delete()
     except Exception:
