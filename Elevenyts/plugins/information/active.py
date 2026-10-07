@@ -35,25 +35,17 @@ async def _active_voice_text() -> str:
         title = (getattr(media, "title", None) or "Unknown track").strip()
         label = await _chat_label(chat_id)
         lines.append(
-            f"<b>{len(lines) + 1}.</b> {label}
-"
+            f"<b>{len(lines) + 1}.</b> {label}\n"
             f"   🎵 <b>Playing:</b> {title[:70]}"
         )
 
     if not lines:
-        return "🎙 <b>ACTIVE VOICE CHATS</b>
+        return "🎙 <b>ACTIVE VOICE CHATS</b>\n\nNo active voice music sessions."
 
-No active voice music sessions."
     return (
-        "🎙 <b>APPLE MUSIX • ACTIVE VOICE CHATS</b>
-
-"
-        f"✦ <b>Active:</b> {len(lines)}
-
-"
-        + "
-
-".join(lines)
+        "🎙 <b>APPLE MUSIX • ACTIVE VOICE CHATS</b>\n\n"
+        f"✦ <b>Active:</b> {len(lines)}\n\n"
+        + "\n\n".join(lines)
     )
 
 
@@ -69,9 +61,7 @@ async def _activevoice(_, m: types.Message):
 
     if _command_name(m) == "ac":
         return await m.reply_text(
-            f"🎙 <b>ACTIVE VOICE CHATS</b>
-
-"
+            f"🎙 <b>ACTIVE VOICE CHATS</b>\n\n"
             f"✦ <b>Active:</b> {len(db.active_calls)}"
         )
 
@@ -92,9 +82,7 @@ async def _activevideo(_, m: types.Message):
 
     if not video_chats:
         return await m.reply_text(
-            "🎥 <b>APPLE MUSIX • ACTIVE VIDEO CHATS</b>
-
-"
+            "🎥 <b>APPLE MUSIX • ACTIVE VIDEO CHATS</b>\n\n"
             "No active Telegram video chats."
         )
 
@@ -102,21 +90,14 @@ async def _activevideo(_, m: types.Message):
     for chat_id in video_chats:
         lines.append(
             f"<b>{len(lines) + 1}.</b> "
-            f"{await _chat_label(chat_id)}
-"
+            f"{await _chat_label(chat_id)}\n"
             "   🎥 <b>Video Chat:</b> Active"
         )
 
     return await m.reply_text(
-        "🎥 <b>APPLE MUSIX • ACTIVE VIDEO CHATS</b>
-
-"
-        f"✦ <b>Active:</b> {len(lines)}
-
-"
-        + "
-
-".join(lines)
+        "🎥 <b>APPLE MUSIX • ACTIVE VIDEO CHATS</b>\n\n"
+        f"✦ <b>Active:</b> {len(lines)}\n\n"
+        + "\n\n".join(lines)
     )
 
 
@@ -133,23 +114,16 @@ async def _vclogger(_, m: types.Message):
     if len(m.command) < 2:
         enabled = await db.get_vc_logger()
         return await m.reply_text(
-            "📋 <b>VC LOGGER</b>
-
-"
-            f"✦ <b>Status:</b> {'Enabled' if enabled else 'Disabled'}
-
-"
-            "<code>/vclogger enable</code>
-"
+            "📋 <b>VC LOGGER</b>\n\n"
+            f"✦ <b>Status:</b> {'Enabled' if enabled else 'Disabled'}\n\n"
+            "<code>/vclogger enable</code>\n"
             "<code>/vclogger disable</code>"
         )
 
     action = m.command[1].lower()
     if action not in {"enable", "disable"}:
         return await m.reply_text(
-            "⚠️ <b>INVALID OPTION</b>
-
-"
+            "⚠️ <b>INVALID OPTION</b>\n\n"
             "Use <code>/vclogger enable</code> or "
             "<code>/vclogger disable</code>."
         )
@@ -158,9 +132,7 @@ async def _vclogger(_, m: types.Message):
     await db.set_vc_logger(enabled)
 
     return await m.reply_text(
-        "📋 <b>VC LOGGER</b>
-
-"
+        "📋 <b>VC LOGGER</b>\n\n"
         f"✅ VC event logging <b>{'enabled' if enabled else 'disabled'}</b>."
     )
 
@@ -178,25 +150,17 @@ async def _autoend(_, m: types.Message):
     if len(m.command) < 2:
         enabled = await db.get_autoleave(m.chat.id)
         return await m.reply_text(
-            "⏹ <b>AUTO-END</b>
-
-"
-            f"✦ <b>Status:</b> {'Enabled' if enabled else 'Disabled'}
-"
-            "✦ Timeout: <b>5 minutes</b> without listeners
-
-"
-            "<code>/autoend enable</code>
-"
+            "⏹ <b>AUTO-END</b>\n\n"
+            f"✦ <b>Status:</b> {'Enabled' if enabled else 'Disabled'}\n"
+            "✦ Timeout: <b>5 minutes</b> without listeners\n\n"
+            "<code>/autoend enable</code>\n"
             "<code>/autoend disable</code>"
         )
 
     action = m.command[1].lower()
     if action not in {"enable", "disable"}:
         return await m.reply_text(
-            "⚠️ <b>INVALID OPTION</b>
-
-"
+            "⚠️ <b>INVALID OPTION</b>\n\n"
             "Use <code>/autoend enable</code> or "
             "<code>/autoend disable</code>."
         )
@@ -205,9 +169,7 @@ async def _autoend(_, m: types.Message):
     await db.set_autoleave(m.chat.id, enabled)
 
     return await m.reply_text(
-        "⏹ <b>AUTO-END</b>
-
-"
+        "⏹ <b>AUTO-END</b>\n\n"
         f"✅ Automatic listener-based ending "
         f"<b>{'enabled' if enabled else 'disabled'}</b>."
     )
