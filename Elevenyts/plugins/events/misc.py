@@ -72,21 +72,73 @@ async def _maintenance_mode_check(
         raise pyrogram.StopPropagation
 
 
+async def _vc_log_event(
+    event: str,
+    chat_id: int,
+) -> None:
+    """Send a VC lifecycle event to the configured logger when enabled."""
+    try:
+        if not await db.get_vc_logger():
+            return
+
+        if not config.LOGGER_ID:
+            logger.warning(
+                "VC logger is enabled but LOGGER_ID is not configured."
+            )
+            return
+
+        try:
+            chat = await app.get_chat(chat_id)
+            title = (
+                chat.title
+                or getattr(chat, "first_name", None)
+                or str(chat_id)
+            )
+        except Exception:
+            title = str(chat_id)
+
+        await app.send_message(
+            config.LOGGER_ID,
+            (
+                "📋 <b>APPLE MUSIX • VC LOGGER</b>\n\n"
+                f"✦ <b>Event:</b> {event}\n"
+                f"✦ <b>Chat:</b> {title}\n"
+                f"✦ <b>Chat ID:</b> <code>{chat_id}</code>"
+            ),
+        )
+    except Exception as e:
+        logger.debug(f"VC logger event failed for {chat_id}: {e}")
+
+
 @app.on_message(
     filters.video_chat_started,
     group=19
 )
+async def _watcher_vc_started(
+    _,
+    m: types.Message
+):
+    chat_id = m.chat.id
+    await db.add_video_chat(chat_id)
+    await _vc_log_event("VIDEO CHAT STARTED", chat_id)
+
+    # Preserve the existing safety behavior: a Telegram video-chat
+    # lifecycle change stops the music stream in this bot.
+    await tune.stop(chat_id)
+
+
 @app.on_message(
     filters.video_chat_ended,
     group=20
 )
-async def _watcher_vc(
+async def _watcher_vc_ended(
     _,
     m: types.Message
 ):
-    await tune.stop(
-        m.chat.id
-    )
+    chat_id = m.chat.id
+    await db.remove_video_chat(chat_id)
+    await _vc_log_event("VIDEO CHAT ENDED", chat_id)
+    await tune.stop(chat_id)
 
 
 async def auto_leave():
