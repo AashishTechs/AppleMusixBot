@@ -55,7 +55,13 @@ async def _pause(_, m: types.Message):
         except (ChatSendPlainForbidden, ChatWriteForbidden):
             return
 
-    await tune.pause(chat_id)
+    success = await tune.pause(chat_id)
+    if not success:
+        try:
+            return await m.reply_text("❌ Failed to pause playback. Please try again.")
+        except (ChatSendPlainForbidden, ChatWriteForbidden):
+            return
+
     try:
         await m.reply_text(
             f"Paused by {m.from_user.mention}",
