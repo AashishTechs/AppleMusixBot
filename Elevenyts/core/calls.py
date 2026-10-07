@@ -264,6 +264,7 @@ class TgCall(PyTgCalls):
                 chat_id,
                 paused=False,
             )
+            self._playback_started_at.pop(chat_id, None)
 
             logger.error(
                 f"Pause failed for {chat_id}: {e}"
