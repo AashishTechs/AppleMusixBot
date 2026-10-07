@@ -73,5 +73,6 @@
   "gcast_end": "✅ <b>Broadcast Completed</b>\n\n📢 Groups: <b>{0}</b>\n👤 Users: <b>{1}</b>",
   "gcast_inactive": "ℹ️ No broadcast is currently running.",
   "gcast_stop": "🛑 Broadcast stopped successfully.",
-  "gcast_stop_log": "🛑 <b>Broadcast Stopped</b>\n\n<b>Owner:</b> <code>{0}</code> ({1})"
+  "gcast_stop_log": "🛑 <b>Broadcast Stopped</b>\n\n<b>Owner:</b> <code>{0}</code> ({1})",
+  "play_next": "<blockquote>⏭️ <b>PLAYING NEXT</b></blockquote>\\n\\n✦ Moving to the next track..."
 }
