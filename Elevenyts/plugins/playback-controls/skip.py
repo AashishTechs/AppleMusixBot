@@ -59,9 +59,24 @@ async def _skip(_, m: types.Message):
         except (ChatSendPlainForbidden, ChatWriteForbidden):
             return
 
-    # Start switching tracks in the background instead of making the
-    # Telegram command handler wait for YouTube stream extraction.
-    asyncio.create_task(tune.play_next(chat_id))
+    # Run the switch synchronously so playback errors are not hidden
+    # inside a fire-and-forget task. play_next() already has its own
+    # per-chat lock, so duplicate skip requests remain protected.
+    try:
+        await tune.play_next(chat_id)
+    except Exception as e:
+        logger.error(
+            "Skip/play_next failed for %s: %s",
+            chat_id,
+            e,
+            exc_info=True,
+        )
+        try:
+            return await m.reply_text(
+                "❌ <b>Could not skip the current track.</b> Please try again."
+            )
+        except (ChatSendPlainForbidden, ChatWriteForbidden):
+            return
 
     try:
         sent_msg = await m.reply_text(
