@@ -19,12 +19,14 @@ from pyrogram import filters, types
 
 from Elevenyts import app, db, lang, queue
 from Elevenyts.helpers import can_manage_vc
+import logging
 
 
 @app.on_message(filters.command(["shuffle", "cshuffle"]) & filters.group & ~app.bl_users)
 @lang.language()
 @can_manage_vc
 async def _shuffle(_, m: types.Message):
+    logging.getLogger(__name__).info("🎛️ /shuffle handler triggered in chat=%s user=%s", m.chat.id, m.from_user.id if m.from_user else None)
     try:
         await m.delete()
     except Exception:
