@@ -141,14 +141,14 @@ async def stop_broadcast(_, message: types.Message) -> None:
 
     broadcasting = False
 
-    # Log broadcast stop
-    await (await app.send_message(
-        chat_id=app.logger,
+    # Keep the detailed stop log private as well.
+    await app.send_message(
+        chat_id=app.owner,
         text=message.lang["gcast_stop_log"].format(
             message.from_user.id,
             message.from_user.mention
         )
-    )).pin(disable_notification=False)
+    )
 
     await message.reply_text(message.lang["gcast_stop"])
 
