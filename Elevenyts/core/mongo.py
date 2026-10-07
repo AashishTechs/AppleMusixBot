@@ -58,6 +58,8 @@ class MongoDB:
         self.admin_list = {}  # Cache admin lists
         self.admin_cache_time = {}  # Track cache freshness
         self.active_calls = {}
+        # Telegram video-chat sessions currently observed by the bot.
+        self.active_video_chats = set()
         self.blacklisted = []
         self.notified = []
         self.cache = self.db.cache
@@ -387,6 +389,35 @@ class MongoDB:
         await self.cache.update_one(
             {"_id": "logger"},
             {"$set": {"status": status}},
+            upsert=True,
+        )
+
+    # VIDEO CHAT / VC LOGGER METHODS
+    async def add_video_chat(self, chat_id: int) -> None:
+        """Track a Telegram video chat currently in progress."""
+        self.active_video_chats.add(chat_id)
+
+    async def remove_video_chat(self, chat_id: int) -> None:
+        """Remove a Telegram video chat from the active set."""
+        self.active_video_chats.discard(chat_id)
+
+    async def get_video_chats(self) -> list[int]:
+        """Return a snapshot of active Telegram video chats."""
+        return list(self.active_video_chats)
+
+    async def get_vc_logger(self) -> bool:
+        """Return the persistent VC event logger state."""
+        doc = await self.cache.find_one({"_id": "vc_logger"})
+        if doc is not None:
+            self.vc_logger = bool(doc.get("enabled", False))
+        return self.vc_logger
+
+    async def set_vc_logger(self, enabled: bool) -> None:
+        """Persist the VC event logger state."""
+        self.vc_logger = bool(enabled)
+        await self.cache.update_one(
+            {"_id": "vc_logger"},
+            {"$set": {"enabled": self.vc_logger}},
             upsert=True,
         )
 
