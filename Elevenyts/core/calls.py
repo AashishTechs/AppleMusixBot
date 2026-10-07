@@ -644,29 +644,52 @@ class TgCall(PyTgCalls):
             for attempt in range(max_retries):
                 try:
                     if call:
-                        logger.debug(
-                            f"Changing stream in existing VC "
-                            f"for {chat_id}"
+                        logger.info(
+                            f"Changing stream in existing VC for {chat_id}"
                         )
                         await client.change_stream(
                             chat_id=chat_id,
                             stream=stream,
-                            config=types.GroupCallConfig(
-                                auto_start=True
-                            ),
+                            config=types.GroupCallConfig(auto_start=True),
                         )
                     else:
-                        logger.debug(
-                            f"Joining VC for playback in {chat_id}"
+                        logger.info(
+                            f"Starting VC playback for {chat_id} "
+                            f"(stream={media.id})"
                         )
                         await client.play(
                             chat_id=chat_id,
                             stream=stream,
-                            config=types.GroupCallConfig(
-                                auto_start=True
-                            ),
+                            config=types.GroupCallConfig(auto_start=True),
                         )
 
+                    # PyTgCalls can return before Telegram has finished
+                    # attaching the stream. Verify the call actually exists
+                    # before marking the track as playing.
+                    active_call = None
+                    for verify_attempt in range(5):
+                        try:
+                            active_call = await client.get_call(chat_id)
+                            if active_call:
+                                break
+                        except (
+                            ConnectionNotFound,
+                            exceptions.NotInCallError,
+                        ):
+                            pass
+
+                        await asyncio.sleep(1)
+
+                    if not active_call:
+                        raise RuntimeError(
+                            f"PyTgCalls returned without an active voice call "
+                            f"for {chat_id}"
+                        )
+
+                    logger.info(
+                        f"VC playback confirmed for {chat_id} "
+                        f"(track={media.id})"
+                    )
                     break
 
                 except errors.FloodWait as fw:
@@ -707,6 +730,11 @@ class TgCall(PyTgCalls):
                         raise
 
                 except Exception as e:
+                    logger.error(
+                        f"PyTgCalls playback attempt {attempt + 1}/"
+                        f"{max_retries} failed for {chat_id}: {e}",
+                        exc_info=True,
+                    )
                     error_msg = str(e).lower()
                     if (
                         "cannot be initialized more than once" in error_msg
