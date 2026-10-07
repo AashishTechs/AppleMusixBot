@@ -55,7 +55,13 @@ async def _resume(_, m: types.Message):
         except (ChatSendPlainForbidden, ChatWriteForbidden):
             return
 
-    await tune.resume(chat_id)
+    success = await tune.resume(chat_id)
+    if not success:
+        try:
+            return await m.reply_text("❌ Failed to resume playback. Please try again.")
+        except (ChatSendPlainForbidden, ChatWriteForbidden):
+            return
+
     try:
         await m.reply_text(
             f"Resumed by {m.from_user.mention}",
