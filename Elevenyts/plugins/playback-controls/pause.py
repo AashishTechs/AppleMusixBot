@@ -36,7 +36,7 @@ async def _pause(_, m: types.Message):
         pass
     
     # Check for channel play mode
-    is_channel = m.command[0].lower() == "cpause"
+    is_channel = m.command[0].lower().split("@", 1)[0] == "cpause"
     chat_id = m.chat.id
     
     if is_channel:
