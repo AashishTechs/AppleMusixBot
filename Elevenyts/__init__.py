@@ -84,10 +84,6 @@ preload = PreloadManager()
 from Elevenyts.helpers import Queue
 queue = Queue()
 
-# Initialize preload manager for next-track downloading
-from Elevenyts.helpers._preload import PreloadManager
-preload = PreloadManager()
-
 # Initialize call handler
 from Elevenyts.core.calls import TgCall
 tune = TgCall()
@@ -96,7 +92,7 @@ tune = TgCall()
 async def stop() -> None:
     """
     Gracefully shutdown the bot and all its components.
-    
+
     This function:
     - Cancels all running background tasks
     - Closes bot and userbot connections
@@ -104,21 +100,21 @@ async def stop() -> None:
     - Logs shutdown completion
     """
     logger.info("🛑 Stopping bot...")
-    
-    # Cancel all background tasks
+
+    # Cancel all running background tasks
     for task in tasks:
         task.cancel()
         try:
             await task
         except asyncio.CancelledError:
-            # Expected when cancelling tasks - suppress the error
+            # Expected when cancelling tasks - suppress this
             pass
         except Exception:
             pass
-    
+
     # Close all connections
     await app.exit()
     await userbot.exit()
     await db.close()
-    
+
     logger.info("✅ Bot stopped successfully.\n")
