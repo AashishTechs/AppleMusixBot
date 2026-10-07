@@ -134,6 +134,62 @@ async def cancel_dl(_, query: types.CallbackQuery):
     await tg.cancel(query)
 
 
+@app.on_callback_query(filters.regex(r"^autoplay ") & ~app.bl_users)
+@lang.language()
+@safe_callback
+async def _autoplay_settings(_, query: types.CallbackQuery):
+    args = query.data.split()
+    action = args[1] if len(args) > 1 else "close"
+    chat_id = int(args[2]) if len(args) > 2 else query.message.chat.id
+
+    if query.from_user.id in app.sudoers:
+        allowed = True
+    elif await db.is_auth(chat_id, query.from_user.id):
+        allowed = True
+    else:
+        allowed = query.from_user.id in await db.get_admins(chat_id)
+
+    if not allowed:
+        return await query.answer(
+            "⚠️ You don't have permission to use this.",
+            show_alert=True,
+        )
+
+    if action == "close":
+        await query.answer()
+        try:
+            await query.message.delete()
+        except Exception:
+            pass
+        return
+
+    if action == "toggle":
+        enabled = not await db.get_autoplay(chat_id)
+        await db.set_autoplay(chat_id, enabled)
+        await query.answer(
+            f"Auto Play {'Enabled' if enabled else 'Disabled'}",
+            show_alert=False,
+        )
+        text = (
+            "<blockquote>🎵 <b>APPLE MUSIX • AUTO PLAY</b></blockquote>\\n\\n"
+            "Auto Play automatically plays related songs when the queue becomes empty.\\n\\n"
+            f"<b>Status:</b> {'✅ Enabled' if enabled else '❌ Disabled'}\\n\\n"
+            "• Queued songs are played first.\\n"
+            "• When the queue ends, related songs are picked from YouTube Mix.\\n"
+            "• Auto Play continues until disabled or the stream is stopped."
+        )
+        try:
+            await query.edit_message_text(
+                text=text,
+                reply_markup=buttons.autoplay_markup(chat_id, enabled),
+            )
+        except Exception:
+            pass
+        return
+
+    await query.answer("⚠️ Invalid Auto Play action.", show_alert=True)
+
+
 @app.on_callback_query(filters.regex("controls") & ~app.bl_users)
 @lang.language()
 @safe_callback
