@@ -51,6 +51,7 @@ class Inline:
         status: str = None,
         timer: str = None,
         remove: bool = False,
+        autoplay: bool | None = None,
     ) -> types.InlineKeyboardMarkup:
 
         if remove:
@@ -97,9 +98,15 @@ class Inline:
                 ],
                 [
                     self.ikb(
-                        text="AUTO PLAY: ON/OFF",
+                        text=(
+                            "AUTO PLAY: ENABLED"
+                            if autoplay is True
+                            else "AUTO PLAY: DISABLED"
+                            if autoplay is False
+                            else "AUTO PLAY"
+                        ),
                         callback_data=f"controls autoplay {chat_id}",
-                        style=ButtonStyle.SUCCESS,
+                        style=ButtonStyle.SUCCESS if autoplay else ButtonStyle.PRIMARY,
                     ),
                 ]
             ]
