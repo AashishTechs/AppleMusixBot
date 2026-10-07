@@ -36,7 +36,9 @@ async def _auth(_, m: types.Message):
     if not user:
         return await utils.safe_text(m, m.lang["user_not_found"])
 
-    if m.command[0] == "auth":
+    command_name = m.command[0].lower().split("@", 1)[0]
+
+    if command_name == "auth":
         if await is_admin(m.chat.id, user.id):
             return await utils.safe_text(m, m.lang["auth_is_admin"])
 
@@ -47,7 +49,7 @@ async def _auth(_, m: types.Message):
         await utils.safe_text(m, m.lang["auth_removed"].format(user.mention))
 
 
-@app.on_message(filters.command(["authlist"]) & filters.group & ~app.bl_users)
+@app.on_message(filters.command(["authlist", "authusers"]) & filters.group & ~app.bl_users)
 @lang.language()
 @admin_check
 async def _authlist(_, m: types.Message):
