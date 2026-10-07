@@ -17,13 +17,14 @@
 from pyrogram import filters, types
 
 from Elevenyts import tune, app, db, lang, queue
-from Elevenyts.helpers import can_manage_vc
+import logging
 
 
 @app.on_message(filters.command(["seek", "seekback", "cseek", "cseekback"]) & filters.group & ~app.bl_users)
 @lang.language()
 @can_manage_vc
 async def _seek(_, m: types.Message):
+    logging.getLogger(__name__).info("🎛️ /seek handler triggered in chat=%s user=%s command=%s", m.chat.id, m.from_user.id if m.from_user else None, m.command)
     try:
         await m.delete()
     except Exception:
