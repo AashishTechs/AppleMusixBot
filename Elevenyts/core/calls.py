@@ -1485,6 +1485,12 @@ class TgCall(PyTgCalls):
 
                     return
 
+                # --------------------------------------------------
+                # Advance the queue for normal playback completion/skip.
+                # Loop mode above reuses the current track without popping it.
+                # --------------------------------------------------
+                media = queue.get_next(chat_id)
+
                 # ==================================================
                 # Delete previous playback message
                 # ==================================================
