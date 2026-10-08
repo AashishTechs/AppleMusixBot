@@ -28,7 +28,8 @@ async def _queue_func(_, m: types.Message):
     except Exception:
         pass
 
-    command_name = m.command[0].lower().split("@", 1)[0]\n    is_channel = command_name in ["cqueue", "cplaying"]
+    command_name = m.command[0].lower().split("@", 1)[0]
+    is_channel = command_name in ["cqueue", "cplaying"]
     chat_id = m.chat.id
 
     if is_channel:
