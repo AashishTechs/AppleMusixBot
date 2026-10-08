@@ -18,7 +18,6 @@ from pyrogram import filters, types
 from pyrogram.errors import ChatSendPlainForbidden, ChatWriteForbidden
 
 from Elevenyts import tune, app, db, lang
-from Elevenyts.helpers import can_manage_vc
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +28,6 @@ logger = logging.getLogger(__name__)
     & ~app.bl_users
 )
 @lang.language()
-@can_manage_vc
 async def _skip(_, m: types.Message):
     try:
         await m.delete()
