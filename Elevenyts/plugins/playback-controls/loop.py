@@ -41,9 +41,6 @@ async def _loop(_, m: types.Message):
     if not await db.get_call(chat_id):
         return await m.reply_text("Nothing is playing.")
 
-    # /loop [1-10]
-    # The number means how many additional times the current track
-    # should be replayed. /loop 0 disables looping.
     if len(m.command) > 1:
         try:
             repeats = int(m.command[1])

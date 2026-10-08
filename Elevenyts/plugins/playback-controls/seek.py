@@ -38,7 +38,6 @@ async def _seek(_, m: types.Message):
 
     raw_time = m.command[1].strip().lower()
 
-    # Accept seconds as well as MM:SS / HH:MM:SS.
     try:
         if ":" in raw_time:
             parts = [int(part) for part in raw_time.split(":")]
@@ -58,7 +57,6 @@ async def _seek(_, m: types.Message):
     if to_seek < 10:
         return await m.reply_text("Minimum seek is 10 seconds")
 
-    # Check for channel play mode
     is_channel = command_name in {"cseek", "cseekback"}
     chat_id = m.chat.id
     

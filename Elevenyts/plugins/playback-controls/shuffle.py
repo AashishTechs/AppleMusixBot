@@ -32,7 +32,6 @@ async def _shuffle(_, m: types.Message):
     except Exception:
         pass
     
-    # Check for channel play mode
     is_channel = m.command[0].lower().split("@", 1)[0] == "cshuffle"
     chat_id = m.chat.id
     

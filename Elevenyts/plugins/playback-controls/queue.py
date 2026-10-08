@@ -47,8 +47,6 @@ async def _queue_func(_, m: types.Message):
             "<blockquote>🎧 <b>Nothing is playing.</b></blockquote>",
         )
 
-    # Work on a copy. The old code popped the current track from the real
-    # queue, which could corrupt the active queue.
     items = list(queue.get_queue(chat_id))
 
     if not items:
@@ -105,7 +103,6 @@ async def _queue_func(_, m: types.Message):
             reply_markup=markup,
         )
     except Exception:
-        # If thumbnail generation/file upload fails, keep the command usable.
         await app.send_message(
             chat_id=m.chat.id,
             text=caption,
