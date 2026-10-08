@@ -37,7 +37,8 @@ async def _skip(_, m: types.Message):
         pass
 
     # Check for channel play mode.
-    command_name = m.command[0].lower().split("@", 1)[0]\n    is_channel = command_name in ["cskip", "cnext"]
+    command_name = m.command[0].lower().split("@", 1)[0]
+    is_channel = command_name in ["cskip", "cnext"]
     chat_id = m.chat.id
 
     if is_channel:
