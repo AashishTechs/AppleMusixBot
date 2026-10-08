@@ -40,7 +40,8 @@ async def _stop(_, m: types.Message):
         return
     
     # Check for channel play mode
-    command_name = m.command[0].lower().split("@", 1)[0]\n    is_channel = command_name in ["cend", "cstop"]
+    command_name = m.command[0].lower().split("@", 1)[0]
+    is_channel = command_name in ["cend", "cstop"]
     chat_id = m.chat.id
     
     if is_channel:
