@@ -18,7 +18,7 @@ import logging
 from pyrogram import filters, types
 from pyrogram.errors import ChatSendPlainForbidden, ChatWriteForbidden
 
-from Elevenyts import tune, app, db, lang
+from Elevenyts import tune, app, db, lang, queue
 from Elevenyts.helpers import can_manage_vc
 
 logger = logging.getLogger(__name__)
@@ -35,6 +35,7 @@ async def _resume(_, m: types.Message):
     except Exception:
         pass
     
+    # Check for channel play mode
     is_channel = m.command[0].lower().split("@", 1)[0] == "cresume"
     chat_id = m.chat.id
     
@@ -56,7 +57,19 @@ async def _resume(_, m: types.Message):
         except (ChatSendPlainForbidden, ChatWriteForbidden):
             return
 
+    # Try PyTgCalls resume first
     success = await tune.resume(chat_id)
+    
+    # If resume fails, replay the current track from where it was paused
+    if not success:
+        logger.warning(f"PyTgCalls resume failed for {chat_id}, attempting replay...")
+        try:
+            await tune.replay(chat_id)
+            success = True
+        except Exception as e:
+            logger.error(f"Replay fallback also failed for {chat_id}: {e}")
+            success = False
+    
     if not success:
         try:
             return await m.reply_text("❌ Failed to resume playback. Please try again.")
