@@ -27,6 +27,7 @@ class Media:
     user: str = None
     is_live: bool = False
     video: bool = False  # ← ADDED
+    stream_headers: dict = None
 
 
 @dataclass
@@ -45,3 +46,4 @@ class Track:
     view_count: str = None
     is_live: bool = False
     video: bool = False  # ← ADDED
+    stream_headers: dict = None
