@@ -18,7 +18,7 @@ class PreloadManager:
     def __init__(self):
         self.tasks: Dict[int, Set[asyncio.Task]] = {}
         self._preloading: Set[str] = set()
-        self._cache: Dict[str, tuple[str, float]] = {}
+        self._cache: Dict[str, tuple[str, dict, float]] = {}
         self._locks: Dict[str, asyncio.Lock] = {}
 
     def _lock_for(self, track_id: str) -> asyncio.Lock:
@@ -28,21 +28,31 @@ class PreloadManager:
             self._locks[track_id] = lock
         return lock
 
-    def get_cached_url(self, track_id: str) -> str | None:
+    def get_cached_stream(self, track_id: str) -> tuple[str, dict] | None:
         cached = self._cache.get(track_id)
         if not cached:
             return None
 
-        url, expires_at = cached
+        url, headers, expires_at = cached
         if expires_at <= time.monotonic():
             self._cache.pop(track_id, None)
             return None
 
-        return url
+        return url, headers
 
-    def set_cached_url(self, track_id: str, url: str) -> None:
+    def get_cached_url(self, track_id: str) -> str | None:
+        cached = self.get_cached_stream(track_id)
+        return cached[0] if cached else None
+
+    def set_cached_url(
+        self,
+        track_id: str,
+        url: str,
+        headers: dict | None = None,
+    ) -> None:
         self._cache[track_id] = (
             url,
+            dict(headers or {}),
             time.monotonic() + self.CACHE_TTL,
         )
 
@@ -90,14 +100,18 @@ class PreloadManager:
                 if yt is None:
                     from Elevenyts import yt
 
-                url = await yt.get_stream_url(
+                stream_info = await yt.get_stream_info(
                     track_id,
                     is_live=getattr(track, "is_live", False),
                     video=getattr(track, "video", False),
                 )
 
-                if url:
-                    self.set_cached_url(track_id, url)
+                if stream_info and stream_info.get("url"):
+                    self.set_cached_url(
+                        track_id,
+                        stream_info["url"],
+                        stream_info.get("headers"),
+                    )
                     logger.debug(
                         f"Preloaded stream URL for {track_id} in chat {chat_id}"
                     )
