@@ -543,12 +543,12 @@ class YouTube:
     # DIRECT STREAM URL EXTRACTION
     # ==========================================================
 
-    async def get_stream_url(
+    async def get_stream_info(
         self,
         video_id: str,
         is_live: bool = False,
         video: bool = False
-    ) -> Optional[str]:
+    ) -> Optional[dict]:
 
         """
         Extract a direct YouTube media URL.
@@ -593,10 +593,12 @@ class YouTube:
 
         if not video:
 
+            # Select audio-only formats. Avoid falling back to "best",
+            # which can select a combined video/audio format.
             ydl_opts["format"] = (
                 "bestaudio[ext=m4a][acodec!=none]/"
                 "bestaudio[acodec!=none]/"
-                "bestaudio/best"
+                "bestaudio"
             )
 
         # ======================================================
@@ -652,9 +654,15 @@ class YouTube:
 
                 direct_url = info.get("url")
 
-                if direct_url:
-
-                    return direct_url
+                # Preserve the request headers returned by yt-dlp. Some
+                # Googlevideo URLs require the same User-Agent as extraction.
+                if direct_url and (
+                    video or info.get("acodec") != "none"
+                ):
+                    return {
+                        "url": direct_url,
+                        "headers": dict(info.get("http_headers") or {}),
+                    }
 
                 # --------------------------------------------------
                 # Formats fallback
@@ -678,7 +686,10 @@ class YouTube:
                             and fmt.get("url")
                         ):
 
-                            return fmt["url"]
+                            return {
+                                "url": fmt["url"],
+                                "headers": dict(fmt.get("http_headers") or info.get("http_headers") or {}),
+                            }
 
                 # Video/audio capable fallback.
                 for fmt in reversed(formats):
@@ -689,7 +700,10 @@ class YouTube:
                         != "none"
                     ):
 
-                        return fmt["url"]
+                        return {
+                            "url": fmt["url"],
+                            "headers": dict(fmt.get("http_headers") or info.get("http_headers") or {}),
+                        }
 
                 # --------------------------------------------------
                 # Manifest fallback
@@ -701,7 +715,10 @@ class YouTube:
 
                 if manifest_url:
 
-                    return manifest_url
+                    return {
+                        "url": manifest_url,
+                        "headers": dict(info.get("http_headers") or {}),
+                    }
 
                 return None
 
@@ -722,7 +739,7 @@ class YouTube:
 
         try:
 
-            stream_url = await asyncio.wait_for(
+            stream_info = await asyncio.wait_for(
                 asyncio.to_thread(
                     _extract
                 ),
@@ -734,12 +751,13 @@ class YouTube:
 
             elapsed = time.monotonic() - started_at
 
-            if stream_url:
+            if stream_info and stream_info.get("url"):
 
                 logger.info(
                     f"Direct stream URL extracted: "
                     f"{video_id} "
-                    f"in {elapsed:.2f}s"
+                    f"in {elapsed:.2f}s "
+                    f"(headers={len(stream_info.get('headers') or {})})"
                 )
 
             else:
@@ -750,7 +768,7 @@ class YouTube:
                     f"after {elapsed:.2f}s"
                 )
 
-            return stream_url
+            return stream_info
 
         except asyncio.TimeoutError:
 
@@ -769,6 +787,20 @@ class YouTube:
             )
 
             return None
+
+    async def get_stream_url(
+        self,
+        video_id: str,
+        is_live: bool = False,
+        video: bool = False
+    ) -> Optional[str]:
+        """Backward-compatible URL-only wrapper."""
+        stream_info = await self.get_stream_info(
+            video_id,
+            is_live=is_live,
+            video=video,
+        )
+        return stream_info.get("url") if stream_info else None
 
     # ==========================================================
     # OLD API DOWNLOAD METHOD
