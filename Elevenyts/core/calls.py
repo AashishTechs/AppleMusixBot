@@ -191,20 +191,23 @@ class TgCall(PyTgCalls):
         try:
             # Use a freshly preloaded URL when available. This removes the
             # YouTube extraction delay from /skip and automatic next-track play.
-            cached_url = preload.get_cached_url(media.id)
-            if cached_url:
+            cached_stream = preload.get_cached_stream(media.id)
+            if cached_stream:
+                cached_url, cached_headers = cached_stream
                 media.file_path = cached_url
+                media.stream_headers = cached_headers
                 return cached_url
 
-            stream_url = await yt.get_stream_url(
+            stream_info = await yt.get_stream_info(
                 media.id,
                 is_live=getattr(media, "is_live", False),
                 video=getattr(media, "video", False),
             )
 
-            if stream_url:
-                media.file_path = stream_url
-                return stream_url
+            if stream_info and stream_info.get("url"):
+                media.file_path = stream_info["url"]
+                media.stream_headers = stream_info.get("headers") or {}
+                return media.file_path
 
             logger.warning(
                 f"Could not extract direct stream URL for {media.id}"
@@ -649,6 +652,7 @@ class TgCall(PyTgCalls):
             audio_flags=types.MediaStream.Flags.REQUIRED,
             video_flags=video_flags,
             ffmpeg_parameters=ffmpeg_params,
+            headers=getattr(media, "stream_headers", None) or {},
         )
 
         # ==================================================
