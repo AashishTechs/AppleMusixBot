@@ -691,13 +691,17 @@ class YouTube:
                                 "headers": dict(fmt.get("http_headers") or info.get("http_headers") or {}),
                             }
 
-                # Video/audio capable fallback.
+                # Fallback formats. Audio playback must remain audio-only;
+                # a combined MP4 is not a safe fallback for voice-chat audio.
                 for fmt in reversed(formats):
 
                     if (
                         fmt.get("url")
-                        and fmt.get("acodec")
-                        != "none"
+                        and fmt.get("acodec") != "none"
+                        and (
+                            video
+                            or fmt.get("vcodec") == "none"
+                        )
                     ):
 
                         return {
