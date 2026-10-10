@@ -141,47 +141,70 @@ class Thumbnail:
             return config.DEFAULT_THUMB
 
 
-    async def fetch_synced_lyrics(self, song: Track) -> list[tuple[int, str]]:
-        """Fetch timestamped lyrics from LRCLIB; return [] when unavailable."""
+    async def fetch_synced_lyrics(self, song: Track) -> list[tuple[float, str]]:
+        """Fetch timestamped lyrics, trying title-only and cleaned-title searches."""
         title = str(getattr(song, "title", "") or "").strip()
         artist = str(getattr(song, "channel_name", "") or "").strip()
         if not title:
             return []
+
+        # YouTube uploads often have long titles (e.g. "Best Of ... 2024")
+        # and a channel name that is not the original performing artist.
+        cleaned = re.sub(
+            r"(?i)\\b(official\\s+)?(audio|video|lyrics?|4k|hd|full album|best of|202[0-9])\\b",
+            " ",
+            title,
+        )
+        cleaned = re.sub(r"\\s+", " ", cleaned).strip(" -|:·")
+        queries = []
+        for value in (title, cleaned):
+            if value and value.casefold() not in [q.casefold() for q in queries]:
+                queries.append(value)
+
+        timeout = aiohttp.ClientTimeout(total=8)
+        headers = {"User-Agent": "AppleMusixBot/1.1 (https://github.com/AashishTechs/AppleMusixBot)"}
         try:
-            timeout = aiohttp.ClientTimeout(total=5)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(
-                    "https://lrclib.net/api/search",
-                    params={"track_name": title, "artist_name": artist},
-                    headers={"User-Agent": "AppleMusixBot/1.0"},
-                ) as response:
-                    if response.status != 200:
-                        return []
-                    data = await response.json(content_type=None)
-            candidates = sorted(
-                data if isinstance(data, list) else [],
-                key=lambda item: bool(item.get("syncedLyrics")),
-                reverse=True,
-            )
-            synced = next(
-                (item.get("syncedLyrics") for item in candidates if item.get("syncedLyrics")),
-                None,
-            )
-            if not synced:
-                return []
-            lines = []
-            for raw in synced.splitlines():
-                match = re.match(r"\s*\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]\s*(.*)", raw)
-                if not match:
-                    continue
-                minutes, seconds, fraction, text = match.groups()
-                millis = int((fraction or "0").ljust(3, "0")[:3])
-                timestamp = int(minutes) * 60 + int(seconds) + millis / 1000
-                if text.strip():
-                    lines.append((timestamp, text.strip()))
-            return sorted(lines)
-        except Exception:
-            return []
+            async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
+                for query in queries:
+                    params = {"q": query}
+                    async with session.get("https://lrclib.net/api/search", params=params) as response:
+                        if response.status != 200:
+                            continue
+                        data = await response.json(content_type=None)
+                    if not isinstance(data, list):
+                        continue
+
+                    # Prefer timestamped matches and title similarity. Do not
+                    # require the YouTube channel name to equal the real artist.
+                    wanted = set(re.findall(r"[a-z0-9]+", cleaned.casefold()))
+                    def rank(item):
+                        candidate = str(item.get("trackName") or "").casefold()
+                        words = set(re.findall(r"[a-z0-9]+", candidate))
+                        similarity = len(wanted & words) / max(1, len(wanted | words))
+                        synced = bool(item.get("syncedLyrics"))
+                        return (synced, similarity)
+
+                    for item in sorted(data, key=rank, reverse=True):
+                        synced = item.get("syncedLyrics")
+                        if not synced:
+                            continue
+                        lines = []
+                        for raw in synced.splitlines():
+                            match = re.match(r"\\s*\\[(\\d{1,2}):(\\d{2})(?:[.:](\\d{1,3}))?\\]\\s*(.*)", raw)
+                            if not match:
+                                continue
+                            minutes, seconds, fraction, text = match.groups()
+                            millis = int((fraction or "0").ljust(3, "0")[:3])
+                            timestamp = int(minutes) * 60 + int(seconds) + millis / 1000
+                            if text.strip():
+                                lines.append((timestamp, text.strip()))
+                        if len(lines) >= 2:
+                            return sorted(lines)
+        except Exception as exc:
+            # Keep music playback working even when the lyrics provider is down.
+            import logging
+            logging.getLogger(__name__).debug("LRCLIB lyrics lookup failed: %s", exc)
+        return []
 
     async def generate_live_frame(
         self,
