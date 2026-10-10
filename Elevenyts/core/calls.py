@@ -71,7 +71,6 @@ class TgCall(PyTgCalls):
         # Monotonic timestamps used to keep Media.time accurate while
         # playback is running. This makes /seekback use the real position.
         self._playback_started_at = {}
-        self._player_update_tasks = {}
 
     # ======================================================
     # Telegram message helpers
@@ -170,38 +169,6 @@ class TgCall(PyTgCalls):
 
         except Exception:
             return None
-
-    async def _update_player_card(self, chat_id: int, target_chat_id: int, media: Track, message_id: int):
-        """Refresh lyrics and progress at a Telegram-friendly interval."""
-        try:
-            lyrics = await thumb.fetch_synced_lyrics(media)
-            while True:
-                await asyncio.sleep(8)
-                current = queue.get_current(chat_id)
-                if not current or str(getattr(current, "id", "")) != str(media.id):
-                    break
-                if not await db.playing(chat_id):
-                    continue
-                position = await self.current_time(chat_id)
-                frame_path = await thumb.generate_live_frame(media, position, lyrics)
-                try:
-                    message_obj = await app.get_messages(target_chat_id, message_id)
-                    if not message_obj or getattr(message_obj, "empty", False):
-                        break
-                    await self._edit_media_with_retry(
-                        message_obj,
-                        InputMediaPhoto(
-                            media=frame_path,
-                            caption=message_obj.caption or "",
-                    ),
-                        message_obj.reply_markup,
-                    )
-                except Exception as e:
-                    logger.debug(f"Player card refresh failed in {chat_id}: {e}")
-        except asyncio.CancelledError:
-            pass
-        except Exception as e:
-            logger.debug(f"Live lyrics updater stopped in {chat_id}: {e}")
 
     # ======================================================
     # Direct stream URL helper
@@ -371,9 +338,6 @@ class TgCall(PyTgCalls):
 
         # Clear queue and database state.
         self._playback_started_at.pop(chat_id, None)
-        player_task = self._player_update_tasks.pop(chat_id, None)
-        if player_task and not player_task.done():
-            player_task.cancel()
 
         try:
             queue.clear(chat_id)
@@ -988,18 +952,6 @@ class TgCall(PyTgCalls):
 
                 if sent_photo:
                     media.message_id = sent_photo.id
-                    if isinstance(media, Track):
-                        previous_task = self._player_update_tasks.pop(chat_id, None)
-                        if previous_task and not previous_task.done():
-                            previous_task.cancel()
-                        self._player_update_tasks[chat_id] = asyncio.create_task(
-                            self._update_player_card(
-                                chat_id,
-                                target_chat_for_messages,
-                                media,
-                                sent_photo.id,
-                            )
-                        )
 
                 # ------------------------------------------------
                 # Start preload manager.
