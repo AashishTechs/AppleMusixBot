@@ -121,7 +121,7 @@ class Thumbnail:
         try:
 
             temp = f"cache/temp_{song.id}.jpg"
-            output = f"cache/{song.id}_full_v7.png"
+            output = f"cache/{song.id}_full_v6.png"
 
             if os.path.exists(output):
                 return output
@@ -139,134 +139,6 @@ class Thumbnail:
 
         except Exception:
             return config.DEFAULT_THUMB
-
-
-    async def fetch_synced_lyrics(self, song: Track) -> list[tuple[float, str]]:
-        """Fetch timestamped lyrics, trying title-only and cleaned-title searches."""
-        title = str(getattr(song, "title", "") or "").strip()
-        artist = str(getattr(song, "channel_name", "") or "").strip()
-        if not title:
-            return []
-
-        # YouTube uploads often have long titles (e.g. "Best Of ... 2024")
-        # and a channel name that is not the original performing artist.
-        cleaned = re.sub(
-            r"(?i)\\b(official\\s+)?(audio|video|lyrics?|4k|hd|full album|best of|202[0-9])\\b",
-            " ",
-            title,
-        )
-        cleaned = re.sub(r"\\s+", " ", cleaned).strip(" -|:·")
-        queries = []
-        for value in (title, cleaned):
-            if value and value.casefold() not in [q.casefold() for q in queries]:
-                queries.append(value)
-
-        timeout = aiohttp.ClientTimeout(total=8)
-        headers = {"User-Agent": "AppleMusixBot/1.1 (https://github.com/AashishTechs/AppleMusixBot)"}
-        try:
-            async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
-                for query in queries:
-                    params = {"q": query}
-                    async with session.get("https://lrclib.net/api/search", params=params) as response:
-                        if response.status != 200:
-                            continue
-                        data = await response.json(content_type=None)
-                    if not isinstance(data, list):
-                        continue
-
-                    # Prefer timestamped matches and title similarity. Do not
-                    # require the YouTube channel name to equal the real artist.
-                    wanted = set(re.findall(r"[a-z0-9]+", cleaned.casefold()))
-                    def rank(item):
-                        candidate = str(item.get("trackName") or "").casefold()
-                        words = set(re.findall(r"[a-z0-9]+", candidate))
-                        similarity = len(wanted & words) / max(1, len(wanted | words))
-                        synced = bool(item.get("syncedLyrics"))
-                        return (synced, similarity)
-
-                    for item in sorted(data, key=rank, reverse=True):
-                        synced = item.get("syncedLyrics")
-                        if not synced:
-                            continue
-                        lines = []
-                        for raw in synced.splitlines():
-                            match = re.match(r"\\s*\\[(\\d{1,2}):(\\d{2})(?:[.:](\\d{1,3}))?\\]\\s*(.*)", raw)
-                            if not match:
-                                continue
-                            minutes, seconds, fraction, text = match.groups()
-                            millis = int((fraction or "0").ljust(3, "0")[:3])
-                            timestamp = int(minutes) * 60 + int(seconds) + millis / 1000
-                            if text.strip():
-                                lines.append((timestamp, text.strip()))
-                        if len(lines) >= 2:
-                            return sorted(lines)
-        except Exception as exc:
-            # Keep music playback working even when the lyrics provider is down.
-            import logging
-            logging.getLogger(__name__).debug("LRCLIB lyrics lookup failed: %s", exc)
-        return []
-
-    async def generate_live_frame(
-        self,
-        song: Track,
-        position: int,
-        lyrics: list[tuple[int, str]],
-    ) -> str:
-        """Render a playback-synced frame without changing the base artwork."""
-        base = await self.generate(song)
-        try:
-            frame = Image.open(base).convert("RGBA")
-            draw = ImageDraw.Draw(frame)
-            # Hide the static duration/play pill while preserving the card layout.
-            draw.rounded_rectangle((465, 255, 910, 425), radius=18, fill=(14, 20, 43, 255))
-            pink = (255, 82, 157, 255)
-            white = (245, 247, 255, 255)
-            muted = (151, 161, 190, 255)
-            try:
-                lyric_font = ImageFont.truetype("Elevenyts/helpers/Inter-Light.ttf", 21)
-                small_font = ImageFont.truetype("Elevenyts/helpers/Inter-Light.ttf", 17)
-            except OSError:
-                lyric_font = ImageFont.load_default()
-                small_font = ImageFont.load_default()
-
-            active = -1
-            for i, (stamp, _) in enumerate(lyrics):
-                if stamp <= position:
-                    active = i
-                else:
-                    break
-            visible = []
-            if active >= 0:
-                visible.extend([(i, lyrics[i][1]) for i in range(max(0, active - 2), min(len(lyrics), active + 3))])
-            elif lyrics:
-                visible.extend([(i, lyrics[i][1]) for i in range(min(5, len(lyrics)))])
-            if not visible:
-                visible = [(-1, "♪  Lyrics unavailable for this track  ♪")]
-
-            y = 266 + max(0, (5 - len(visible)) * 12)
-            for index, line in visible[:5]:
-                color = pink if index == active else (white if index >= 0 else muted)
-                text = trim_to_width(line, lyric_font, 410)
-                draw.text((480, y), text, fill=color, font=lyric_font)
-                y += 31
-
-            duration = max(0, int(getattr(song, "duration_sec", 0) or 0))
-            x1, x2, bar_y = 480, 885, 454
-            draw.rounded_rectangle((x1, bar_y, x2, bar_y + 5), radius=3, fill=(64, 71, 99, 255))
-            progress = min(1.0, position / duration) if duration else 0.0
-            fill_x = x1 + int((x2 - x1) * progress)
-            draw.rounded_rectangle((x1, bar_y, max(x1 + 1, fill_x), bar_y + 5), radius=3, fill=pink)
-            def stamp(seconds):
-                seconds = max(0, int(seconds))
-                return f"{seconds // 60:02d}:{seconds % 60:02d}"
-            draw.text((480, 468), stamp(position), fill=white, font=small_font)
-            draw.text((825, 468), stamp(duration), fill=muted, font=small_font)
-
-            output = f"cache/{song.id}_live_{int(position // 8)}.png"
-            frame.save(output)
-            return output
-        except Exception:
-            return base
 
     def _generate_sync(
         self,
@@ -286,7 +158,7 @@ class Thumbnail:
                 source = src.convert("RGBA")
 
                 # One fixed background for the entire card.
-                bg_color = (14, 20, 43, 255)
+                bg_color = (16, 56, 42, 255)
                 card = Image.new("RGBA", (player_w, player_h), bg_color)
                 draw = ImageDraw.Draw(card)
 
@@ -353,11 +225,11 @@ class Thumbnail:
                     "Elevenyts/helpers/Inter-Light.ttf", 24
                 )
 
-                accent = (255, 82, 157, 255)
-                artist_color = (255, 164, 204, 255)
-                muted = (164, 173, 202, 255)
+                accent = (48, 211, 154, 255)
+                artist_color = (120, 228, 181, 255)
+                muted = (171, 201, 190, 255)
                 white = (250, 252, 251, 255)
-                dark = (14, 20, 43, 255)
+                dark = (16, 56, 42, 255)
 
                 draw.text(
                     (rx, 102),
