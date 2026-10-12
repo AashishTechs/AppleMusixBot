@@ -55,7 +55,7 @@ ICONS_Y = BAR_Y + 65
 
 MAX_TITLE_WIDTH = 850
 
-_f = "QXBwbGUgTXVzaXg="
+_f = "QXJ0aXN0Ym90cw=="
 
 
 def _decode_f():
@@ -121,7 +121,7 @@ class Thumbnail:
         try:
 
             temp = f"cache/temp_{song.id}.jpg"
-            output = f"cache/{song.id}_full_v6.png"
+            output = f"cache/{song.id}_full.png"
 
             if os.path.exists(output):
                 return output
@@ -149,201 +149,161 @@ class Thumbnail:
     ) -> str:
 
         try:
-            # Premium reference-style music card.
-            # Keep the existing 930x523 output size; all visual positions
-            # below are scaled to match the supplied reference image.
-            player_w, player_h = 930, 523
+            # --------------------------------------------------
+            # Reference-style music player card.
+            # The source thumbnail is used as the album/video art
+            # while the rest of the player UI is rendered locally.
+            # --------------------------------------------------
+            with Image.open(temp) as temp_img:
+                source = temp_img.convert("RGB")
+                # Keep the original thumbnail aspect ratio so the full
+                # song image is visible without stretching or cropping.
+                base = ImageOps.fit(source, size, method=Image.Resampling.LANCZOS)
 
-            with Image.open(temp) as src:
-                source = src.convert("RGBA")
+            # Blurred background.
+            bg = base.filter(ImageFilter.GaussianBlur(32))
+            bg = ImageEnhance.Brightness(bg).enhance(0.32)
+            bg = ImageEnhance.Contrast(bg).enhance(1.15)
+            bg = bg.convert("RGBA")
 
-                # One fixed background for the entire card.
-                bg_color = (16, 56, 42, 255)
-                card = Image.new("RGBA", (player_w, player_h), bg_color)
-                draw = ImageDraw.Draw(card)
+            # Main rounded player surface.
+            card = Image.new("RGBA", (1140, 610), (24, 35, 47, 238))
+            mask = Image.new("L", card.size, 0)
+            ImageDraw.Draw(mask).rounded_rectangle(
+                (0, 0, 1139, 609),
+                radius=34,
+                fill=255,
+            )
+            bg.alpha_composite(card, (70, 55))
 
-                # Soft inner highlight, while keeping the background color fixed.
-                # Clean card: no visible outer border.
+            draw = ImageDraw.Draw(bg)
 
+            # Album/video art: preserve the complete source image.
+            art_w, art_h = 500, 282
+            art_x, art_y = 105, 145
+            art = ImageOps.contain(
+                source,
+                (art_w, art_h),
+                method=Image.Resampling.LANCZOS,
+            )
+            art_canvas = Image.new("RGB", (art_w, art_h), (18, 25, 34))
+            art_canvas.paste(
+                art,
+                ((art_w - art.width) // 2, (art_h - art.height) // 2),
+            )
+            art_mask = Image.new("L", art_canvas.size, 0)
+            ImageDraw.Draw(art_mask).rounded_rectangle(
+                (0, 0, art_w - 1, art_h - 1),
+                radius=26,
+                fill=255,
+            )
+            bg.paste(art_canvas, (art_x, art_y), art_mask)
 
-                # Artwork: TRUE SQUARE cover.
-                # The player always shows a 1:1 cover area.  The source is
-                # proportionally resized and softly extended to the square
-                # so the cover never becomes a visible 16:9 rectangle.
-                art_size = 390
-                art_x, art_y = 36, 66
+            # Fonts.
+            title_font = self.title_font
+            regular_font = self.regular_font
+            icon_font = ImageFont.truetype(
+                "Elevenyts/helpers/Raleway-Bold.ttf",
+                34,
+            )
 
-                # Build a square background from the same artwork.
-                square_bg = ImageOps.fit(
-                    source,
-                    (art_size, art_size),
-                    method=Image.Resampling.LANCZOS,
-                    centering=(0.5, 0.5)
-                )
-                square_bg = square_bg.filter(ImageFilter.GaussianBlur(10))
-                square_bg = ImageEnhance.Color(square_bg).enhance(0.9)
-                square_bg = ImageEnhance.Brightness(square_bg).enhance(0.72)
+            clean_title = re.sub(r"\s+", " ", song.title).strip()
+            final_title = trim_to_width(
+                clean_title,
+                title_font,
+                610,
+            )
 
-                # Put the complete original artwork over the square canvas.
-                # No stretching: its aspect ratio is preserved.
-                art = ImageOps.contain(
-                    source,
-                    (art_size, art_size),
-                    method=Image.Resampling.LANCZOS
-                )
-                art = ImageEnhance.Color(art).enhance(1.05)
+            # Right-side title and source.
+            text_x = 575
+            draw.text(
+                (text_x + 2, 170 + 2),
+                final_title,
+                fill=(0, 0, 0, 180),
+                font=title_font,
+            )
+            draw.text(
+                (text_x, 170),
+                final_title,
+                fill=(255, 255, 255, 255),
+                font=title_font,
+            )
 
-                art_box = square_bg.copy()
-                ax = (art_size - art.width) // 2
-                ay = (art_size - art.height) // 2
-                art_box.alpha_composite(art, (ax, ay))
+            draw.text(
+                (text_x, 225),
+                "NOW PLAYING",
+                fill=(175, 190, 205, 255),
+                font=regular_font,
+            )
 
-                art_mask = Image.new("L", (art_size, art_size), 0)
-                ImageDraw.Draw(art_mask).rounded_rectangle(
-                    (0, 0, art_size - 1, art_size - 1),
-                    radius=22,
-                    fill=255
-                )
-                card.paste(art_box, (art_x, art_y), art_mask)
+            # Progress bar.
+            bar_x = text_x
+            bar_y = 345
+            bar_w = 470
 
-                # Right-side song information — scaled to the supplied
-                # reference image.  The artwork block above is intentionally
-                # untouched.
-                rx = 480
-                rw = player_w - rx - 42
+            draw.rounded_rectangle(
+                (bar_x, bar_y, bar_x + bar_w, bar_y + 7),
+                radius=4,
+                fill=(92, 105, 118, 255),
+            )
+            draw.rounded_rectangle(
+                (bar_x, bar_y, bar_x + 95, bar_y + 7),
+                radius=4,
+                fill=(235, 238, 242, 255),
+            )
+            draw.ellipse(
+                (bar_x + 87, bar_y - 5, bar_x + 101, bar_y + 9),
+                fill=(255, 255, 255, 255),
+            )
 
-                now_font = ImageFont.truetype(
-                    "Elevenyts/helpers/Raleway-Bold.ttf", 24
-                )
-                title_font = ImageFont.truetype(
-                    "Elevenyts/helpers/Raleway-Bold.ttf", 44
-                )
-                artist_font = ImageFont.truetype(
-                    "Elevenyts/helpers/Inter-Light.ttf", 31
-                )
-                small_font = ImageFont.truetype(
-                    "Elevenyts/helpers/Inter-Light.ttf", 24
-                )
+            draw.text(
+                (bar_x, bar_y + 20),
+                "0:00",
+                fill=(190, 200, 210, 255),
+                font=regular_font,
+            )
+            draw.text(
+                (bar_x + bar_w - 65, bar_y + 20),
+                song.duration,
+                fill=(190, 200, 210, 255),
+                font=regular_font,
+            )
 
-                accent = (48, 211, 154, 255)
-                artist_color = (120, 228, 181, 255)
-                muted = (171, 201, 190, 255)
-                white = (250, 252, 251, 255)
-                dark = (16, 56, 42, 255)
-
+            # Player controls matching the reference image.
+            controls = [
+                ("|<<", 650),
+                ("Ⅱ", 755),
+                (">>|", 860),
+            ]
+            for label, x in controls:
                 draw.text(
-                    (rx, 102),
-                    "NOW PLAYING",
-                    fill=accent,
-                    font=now_font
+                    (x, 420),
+                    label,
+                    fill=(245, 248, 250, 255),
+                    font=icon_font,
                 )
 
-                title = trim_to_width(
-                    str(song.title or "Unknown Track"),
-                    title_font,
-                    rw
-                )
-                artist = trim_to_width(
-                    str(song.channel_name or "Apple Musix"),
-                    artist_font,
-                    rw
-                )
+            draw.text(
+                (text_x, 485),
+                "🔊",
+                fill=(220, 230, 240, 255),
+                font=regular_font,
+            )
+            draw.rounded_rectangle(
+                (text_x + 45, 498, text_x + 540, 504),
+                radius=3,
+                fill=(95, 108, 120, 255),
+            )
 
-                draw.text(
-                    (rx, 151),
-                    title,
-                    fill=white,
-                    font=title_font
-                )
+            # Small signature, matching the existing bot branding area.
+            draw.text(
+                (105, 92),
+                "APPLE MUSIC <<3",
+                fill=(255, 255, 255, 230),
+                font=self.signature_font,
+            )
 
-                draw.text(
-                    (rx, 218),
-                    artist,
-                    fill=artist_color,
-                    font=artist_font
-                )
-
-                duration = str(getattr(song, "duration", "") or "")
-                duration_label = (
-                    f"Duration  •  {duration}"
-                    if duration
-                    else "Duration  •  --:--"
-                )
-                draw.text(
-                    (rx, 273),
-                    duration_label,
-                    fill=muted,
-                    font=small_font
-                )
-
-                # Compact reference-style Play pill.
-                pill_x, pill_y = rx, 331
-                pill_w, pill_h = 230, 58
-
-                draw.rounded_rectangle(
-                    (pill_x, pill_y, pill_x + pill_w, pill_y + pill_h),
-                    radius=29,
-                    fill=accent
-                )
-
-                py = pill_y + pill_h // 2
-                draw.polygon(
-                    [
-                        (pill_x + 48, py - 15),
-                        (pill_x + 48, py + 15),
-                        (pill_x + 75, py)
-                    ],
-                    fill=dark
-                )
-
-                draw.text(
-                    (pill_x + 103, pill_y + 8),
-                    "Play",
-                    fill=dark,
-                    font=ImageFont.truetype(
-                        "Elevenyts/helpers/Raleway-Bold.ttf", 28
-                    )
-                )
-
-                # Reference music icon in the upper-right corner.
-                mx, my = player_w - 88, 52
-                draw.rectangle(
-                    (mx - 2, my + 12, mx + 4, my + 50),
-                    fill=accent
-                )
-                draw.rectangle(
-                    (mx + 20, my + 5, mx + 26, my + 43),
-                    fill=accent
-                )
-                draw.polygon(
-                    [
-                        (mx - 2, my + 12),
-                        (mx + 26, my + 5),
-                        (mx + 26, my + 14),
-                        (mx - 2, my + 21)
-                    ],
-                    fill=accent
-                )
-                draw.ellipse(
-                    (mx - 16, my + 43, mx + 6, my + 59),
-                    fill=accent
-                )
-                draw.ellipse(
-                    (mx + 9, my + 36, mx + 31, my + 52),
-                    fill=accent
-                )
-
-                # Rounded outer card.
-                mask = Image.new("L", card.size, 0)
-                ImageDraw.Draw(mask).rounded_rectangle(
-                    (0, 0, player_w - 1, player_h - 1),
-                    radius=30,
-                    fill=255
-                )
-
-                final = Image.new("RGBA", (player_w, player_h), bg_color)
-                final.paste(card, (0, 0), mask)
-                final.save(output)
+            bg.convert("RGB").save(output, quality=95)
 
             try:
                 os.remove(temp)
@@ -351,9 +311,6 @@ class Thumbnail:
                 pass
 
             return output
-
-
-
 
         except Exception:
             return config.DEFAULT_THUMB
