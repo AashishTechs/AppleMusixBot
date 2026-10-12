@@ -242,14 +242,6 @@ class YouTube:
 
             "skip_download": True,
 
-            "extractor_args": {
-                "youtube": {
-                    "player_client": [
-                        "android",
-                        "web"
-                    ]
-                }
-            },
         }
 
         # ------------------------------------------------------
@@ -543,6 +535,20 @@ class YouTube:
     # DIRECT STREAM URL EXTRACTION
     # ==========================================================
 
+    @staticmethod
+    def _clean_stream_headers(headers: Optional[dict]) -> dict:
+        """Keep the User-Agent needed by Googlevideo without passing a
+        collection of headers that may be handled inconsistently by FFmpeg.
+        """
+        if not headers:
+            return {}
+
+        for key, value in headers.items():
+            if key.lower() == "user-agent" and value:
+                return {"User-Agent": value}
+
+        return {}
+
     async def get_stream_info(
         self,
         video_id: str,
@@ -754,6 +760,11 @@ class YouTube:
             )
 
             elapsed = time.monotonic() - started_at
+
+            if stream_info:
+                stream_info["headers"] = self._clean_stream_headers(
+                    stream_info.get("headers")
+                )
 
             if stream_info and stream_info.get("url"):
 
