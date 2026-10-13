@@ -660,15 +660,35 @@ class YouTube:
 
                 direct_url = info.get("url")
 
+                # For voice-chat audio, a direct URL is valid only when
+                # yt-dlp confirms that the selected format is audio-only.
+                # A combined MP4 (for example YouTube itag 18) has an audio
+                # codec too, so checking acodec alone can incorrectly pass it
+                # to PyTgCalls and trigger NoAudioSourceFound.
+                audio_only = (
+                    info.get("acodec") not in (None, "none")
+                    and info.get("vcodec") == "none"
+                )
+
                 # Preserve the request headers returned by yt-dlp. Some
                 # Googlevideo URLs require the same User-Agent as extraction.
-                if direct_url and (
-                    video or info.get("acodec") != "none"
-                ):
+                if direct_url and (video or audio_only):
                     return {
                         "url": direct_url,
                         "headers": dict(info.get("http_headers") or {}),
                     }
+
+                if not video and direct_url:
+                    logger.warning(
+                        "Rejected non-audio-only direct format for %s "
+                        "(format_id=%s, ext=%s, acodec=%s, vcodec=%s); "
+                        "checking available audio-only formats",
+                        video_id,
+                        info.get("format_id"),
+                        info.get("ext"),
+                        info.get("acodec"),
+                        info.get("vcodec"),
+                    )
 
                 # --------------------------------------------------
                 # Formats fallback
@@ -719,12 +739,12 @@ class YouTube:
                 # Manifest fallback
                 # --------------------------------------------------
 
-                manifest_url = info.get(
-                    "manifest_url"
-                )
+                manifest_url = info.get("manifest_url")
 
-                if manifest_url:
-
+                # A top-level manifest URL does not identify whether its
+                # variants contain audio. Do not pass an unverified manifest
+                # to an audio-only voice-chat stream.
+                if video and manifest_url:
                     return {
                         "url": manifest_url,
                         "headers": dict(info.get("http_headers") or {}),
