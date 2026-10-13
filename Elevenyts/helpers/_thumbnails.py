@@ -214,6 +214,7 @@ class Thumbnail:
         lyrics: list[tuple[int, str]],
     ) -> str:
         """Render a playback-synced frame without changing the base artwork."""
+        os.makedirs("cache", exist_ok=True)
         base = await self.generate(song)
         try:
             frame = Image.open(base).convert("RGBA")
