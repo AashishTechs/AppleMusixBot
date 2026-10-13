@@ -444,33 +444,36 @@ class TgCall(PyTgCalls):
         # --------------------------------------------------
         # Direct stream URL
         #
-        # If file_path is empty, generate a fresh URL.
+        # YouTube URLs are temporary and may already have expired
+        # while a track waited in the queue. Always resolve a fresh
+        # URL (or a fresh preloaded URL) immediately before playback;
+        # do not trust media.file_path merely because it is non-empty.
         # --------------------------------------------------
 
-        if not media.file_path:
+        media.file_path = None
+        media.stream_headers = None
+        stream_url = await self._get_stream_url(media)
 
-            stream_url = await self._get_stream_url(media)
+        if not stream_url:
+            if thumb_task:
+                thumb_task.cancel()
 
-            if not stream_url:
-                if thumb_task:
-                    thumb_task.cancel()
-
-                if message:
-                    try:
-                        await message.edit_text(
-                            _lang["error_no_file"].format(
-                                config.SUPPORT_CHAT
-                            )
+            if message:
+                try:
+                    await message.edit_text(
+                        _lang["error_no_file"].format(
+                            config.SUPPORT_CHAT
                         )
-                    except Exception:
-                        pass
-
-                else:
-                    logger.error(
-                        f"No direct stream URL for media in {chat_id}"
                     )
+                except Exception:
+                    pass
 
-                return
+            else:
+                logger.error(
+                    f"No direct stream URL for media in {chat_id}"
+                )
+
+            return
 
         # --------------------------------------------------
         # Validate chat
