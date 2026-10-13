@@ -18,14 +18,23 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install panel test dependencies
+        run: python -m pip install --disable-pip-version-check pillow aiohttp
       - name: Compile Python sources
         run: python -m compileall -q Elevenyts
-      - name: Check live player hooks and lyric timestamp parsing
+      - name: Check live player hooks, LRC timestamps, and render frames
         run: |
           python - <<'PY'
           import ast
+          import asyncio
+          import importlib.util
           import re
+          import sys
+          import tempfile
           from pathlib import Path
+          from types import ModuleType, SimpleNamespace
+
+          from PIL import Image
 
           calls_path = Path("Elevenyts/core/calls.py")
           thumb_path = Path("Elevenyts/helpers/_thumbnails.py")
@@ -36,8 +45,52 @@ jobs:
           assert "async def _update_player_card" in calls_source
           assert "self._update_player_card(" in calls_source
           assert "async def generate_live_frame" in thumb_source
+
           timestamp = re.compile(r"\s*\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?\]\s*(.*)")
           match = timestamp.match("[01:23.450] lyric line")
           assert match and match.groups() == ("01", "23", "450", "lyric line")
-          print("Panel hooks, Python syntax, and synced-lyrics timestamps passed.")
+
+          # Load the thumbnail module without importing the bot's runtime clients.
+          package = ModuleType("Elevenyts")
+          package.config = SimpleNamespace(DEFAULT_THUMB="fallback.png")
+          helpers = ModuleType("Elevenyts.helpers")
+          helpers.Track = object
+          sys.modules["Elevenyts"] = package
+          sys.modules["Elevenyts.helpers"] = helpers
+          spec = importlib.util.spec_from_file_location("panel_under_test", thumb_path)
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          renderer = module.Thumbnail()
+
+          with tempfile.TemporaryDirectory() as directory:
+              source_path = str(Path(directory) / "source.jpg")
+              output_path = str(Path(directory) / "player.png")
+              Image.new("RGB", (1280, 720), (40, 55, 90)).save(source_path)
+              song = SimpleNamespace(
+                  id="panel-ci-test",
+                  title="Sample Song",
+                  channel_name="Sample Artist",
+                  duration="03:30",
+                  duration_sec=210,
+                  thumbnail="",
+              )
+              rendered = renderer._generate_sync(source_path, output_path, song)
+              assert rendered == output_path and Path(rendered).is_file(), rendered
+              with Image.open(rendered) as image:
+                  assert image.size == (930, 523), image.size
+
+              async def test_live_frame():
+                  async def base_image(_song, size=(1280, 720)):
+                      return output_path
+                  renderer.generate = base_image
+                  frame = await renderer.generate_live_frame(
+                      song, 42, [(0, "First lyric"), (40, "Current lyric"), (80, "Next lyric")]
+                  )
+                  assert Path(frame).is_file(), frame
+                  with Image.open(frame) as image:
+                      assert image.size == (930, 523), image.size
+
+              asyncio.run(test_live_frame())
+
+          print("Python syntax, player hooks, LRC parsing, static card, and live frame passed.")
           PY
