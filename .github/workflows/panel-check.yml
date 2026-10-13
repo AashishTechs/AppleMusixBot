@@ -1,0 +1,43 @@
+name: AppleMusix song panel checks
+
+on:
+  push:
+    branches:
+      - feature/exact-song-panel-safe
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  python-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile Python sources
+        run: python -m compileall -q Elevenyts
+      - name: Check live player hooks and lyric timestamp parsing
+        run: |
+          python - <<'PY'
+          import ast
+          import re
+          from pathlib import Path
+
+          calls_path = Path("Elevenyts/core/calls.py")
+          thumb_path = Path("Elevenyts/helpers/_thumbnails.py")
+          calls_source = calls_path.read_text(encoding="utf-8")
+          thumb_source = thumb_path.read_text(encoding="utf-8")
+          ast.parse(calls_source, filename=str(calls_path))
+          ast.parse(thumb_source, filename=str(thumb_path))
+          assert "async def _update_player_card" in calls_source
+          assert "self._update_player_card(" in calls_source
+          assert "async def generate_live_frame" in thumb_source
+          timestamp = re.compile(r"\s*\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?\]\s*(.*)")
+          match = timestamp.match("[01:23.450] lyric line")
+          assert match and match.groups() == ("01", "23", "450", "lyric line")
+          print("Panel hooks, Python syntax, and synced-lyrics timestamps passed.")
+          PY
