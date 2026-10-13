@@ -213,6 +213,26 @@ class TgCall(PyTgCalls):
                 f"Could not extract direct stream URL for {media.id}"
             )
 
+            # YouTube sometimes exposes only a combined A/V format (for
+            # example itag 18) to yt-dlp. That is not reliable for the
+            # audio-only PyTgCalls stream, so fall back to a local download.
+            # Live streams cannot be downloaded this way and must use a
+            # direct stream URL.
+            if not getattr(media, "is_live", False):
+                fallback_path = await yt.download_via_cookies(
+                    media.id,
+                    video=getattr(media, "video", False),
+                )
+                if fallback_path and fallback_path != "":
+                    media.file_path = fallback_path
+                    media.stream_headers = {}
+                    logger.info(
+                        "Using downloaded fallback media for %s (%s)",
+                        media.id,
+                        fallback_path,
+                    )
+                    return fallback_path
+
             return None
 
         except Exception as e:
@@ -220,6 +240,34 @@ class TgCall(PyTgCalls):
                 f"Direct stream extraction failed for {media.id}: {e}",
                 exc_info=True,
             )
+
+            # A transient extraction exception should not immediately fail
+            # /play when the cookie-based downloader can still retrieve the
+            # media. Do not attempt this for live streams.
+            if not getattr(media, "is_live", False):
+                try:
+                    fallback_path = await yt.download_via_cookies(
+                        media.id,
+                        video=getattr(media, "video", False),
+                    )
+                    if fallback_path:
+                        media.file_path = fallback_path
+                        media.stream_headers = {}
+                        logger.info(
+                            "Using downloaded fallback media after extraction error "
+                            "for %s (%s)",
+                            media.id,
+                            fallback_path,
+                        )
+                        return fallback_path
+                except Exception as fallback_error:
+                    logger.error(
+                        "Cookie download fallback failed for %s: %s",
+                        media.id,
+                        fallback_error,
+                        exc_info=True,
+                    )
+
             return None
 
     # ======================================================
