@@ -120,6 +120,7 @@ class Thumbnail:
 
         try:
 
+            os.makedirs("cache", exist_ok=True)
             temp = f"cache/temp_{song.id}.jpg"
             output = f"cache/{song.id}_full_v8.png"
 
