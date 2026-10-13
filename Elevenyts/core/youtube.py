@@ -585,6 +585,15 @@ class YouTube:
 
         ydl_opts = self._get_ydl_opts()
 
+        # Match the known-working VPS extraction profile. The default
+        # yt-dlp YouTube client can expose audio-only formats with cookies,
+        # while the implicit client selection may return no matching format.
+        ydl_opts["extractor_args"] = {
+            "youtube": {
+                "player_client": ["default"],
+            }
+        }
+
         # ------------------------------------------------------
         # Cookies
         # ------------------------------------------------------
@@ -601,11 +610,9 @@ class YouTube:
 
             # Select audio-only formats. Avoid falling back to "best",
             # which can select a combined video/audio format.
-            ydl_opts["format"] = (
-                "bestaudio[ext=m4a][acodec!=none]/"
-                "bestaudio[acodec!=none]/"
-                "bestaudio"
-            )
+            # Keep this aligned with the manually verified VPS command:
+            # yt-dlp --cookies ... -f "bestaudio[ext=m4a]/bestaudio" -g ...
+            ydl_opts["format"] = "bestaudio[ext=m4a]/bestaudio"
 
         # ======================================================
         # VIDEO STREAM
