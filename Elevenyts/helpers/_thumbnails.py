@@ -55,7 +55,7 @@ ICONS_Y = BAR_Y + 65
 
 MAX_TITLE_WIDTH = 850
 
-_f = "QXJ0aXN0Ym90cw=="
+_f = "QXBwbGUgTXVzaXg="
 
 
 def _decode_f():
@@ -120,8 +120,9 @@ class Thumbnail:
 
         try:
 
+            os.makedirs("cache", exist_ok=True)
             temp = f"cache/temp_{song.id}.jpg"
-            output = f"cache/{song.id}_full.png"
+            output = f"cache/{song.id}_full_v8.png"
 
             if os.path.exists(output):
                 return output
@@ -140,6 +141,135 @@ class Thumbnail:
         except Exception:
             return config.DEFAULT_THUMB
 
+
+    async def fetch_synced_lyrics(self, song: Track) -> list[tuple[float, str]]:
+        """Fetch timestamped lyrics, trying title-only and cleaned-title searches."""
+        title = str(getattr(song, "title", "") or "").strip()
+        artist = str(getattr(song, "channel_name", "") or "").strip()
+        if not title:
+            return []
+
+        # YouTube uploads often have long titles (e.g. "Best Of ... 2024")
+        # and a channel name that is not the original performing artist.
+        cleaned = re.sub(
+            r"(?i)\b(official\s+)?(audio|video|lyrics?|4k|hd|full album|best of|202[0-9])\b",
+            " ",
+            title,
+        )
+        cleaned = re.sub(r"\s+", " ", cleaned).strip(" -|:·")
+        queries = []
+        for value in (title, cleaned):
+            if value and value.casefold() not in [q.casefold() for q in queries]:
+                queries.append(value)
+
+        timeout = aiohttp.ClientTimeout(total=8)
+        headers = {"User-Agent": "AppleMusixBot/1.1 (https://github.com/AashishTechs/AppleMusixBot)"}
+        try:
+            async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
+                for query in queries:
+                    params = {"q": query}
+                    async with session.get("https://lrclib.net/api/search", params=params) as response:
+                        if response.status != 200:
+                            continue
+                        data = await response.json(content_type=None)
+                    if not isinstance(data, list):
+                        continue
+
+                    # Prefer timestamped matches and title similarity. Do not
+                    # require the YouTube channel name to equal the real artist.
+                    wanted = set(re.findall(r"[a-z0-9]+", cleaned.casefold()))
+                    def rank(item):
+                        candidate = str(item.get("trackName") or "").casefold()
+                        words = set(re.findall(r"[a-z0-9]+", candidate))
+                        similarity = len(wanted & words) / max(1, len(wanted | words))
+                        synced = bool(item.get("syncedLyrics"))
+                        return (synced, similarity)
+
+                    for item in sorted(data, key=rank, reverse=True):
+                        synced = item.get("syncedLyrics")
+                        if not synced:
+                            continue
+                        lines = []
+                        for raw in synced.splitlines():
+                            match = re.match(r"\s*\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?\]\s*(.*)", raw)
+                            if not match:
+                                continue
+                            minutes, seconds, fraction, text = match.groups()
+                            millis = int((fraction or "0").ljust(3, "0")[:3])
+                            timestamp = int(minutes) * 60 + int(seconds) + millis / 1000
+                            if text.strip():
+                                lines.append((timestamp, text.strip()))
+                        if len(lines) >= 2:
+                            return sorted(lines)
+        except Exception as exc:
+            # Keep music playback working even when the lyrics provider is down.
+            import logging
+            logging.getLogger(__name__).debug("LRCLIB lyrics lookup failed: %s", exc)
+        return []
+
+    async def generate_live_frame(
+        self,
+        song: Track,
+        position: int,
+        lyrics: list[tuple[int, str]],
+    ) -> str:
+        """Render a playback-synced frame without changing the base artwork."""
+        os.makedirs("cache", exist_ok=True)
+        base = await self.generate(song)
+        try:
+            frame = Image.open(base).convert("RGBA")
+            draw = ImageDraw.Draw(frame)
+            # Hide the static duration/play pill while preserving the card layout.
+            draw.rounded_rectangle((465, 255, 910, 425), radius=18, fill=(14, 20, 43, 255))
+            pink = (255, 82, 157, 255)
+            white = (245, 247, 255, 255)
+            muted = (151, 161, 190, 255)
+            try:
+                lyric_font = ImageFont.truetype("Elevenyts/helpers/Inter-Light.ttf", 21)
+                small_font = ImageFont.truetype("Elevenyts/helpers/Inter-Light.ttf", 17)
+            except OSError:
+                lyric_font = ImageFont.load_default()
+                small_font = ImageFont.load_default()
+
+            active = -1
+            for i, (stamp, _) in enumerate(lyrics):
+                if stamp <= position:
+                    active = i
+                else:
+                    break
+            visible = []
+            if active >= 0:
+                visible.extend([(i, lyrics[i][1]) for i in range(max(0, active - 2), min(len(lyrics), active + 3))])
+            elif lyrics:
+                visible.extend([(i, lyrics[i][1]) for i in range(min(5, len(lyrics)))])
+            if not visible:
+                visible = [(-1, "♪  Lyrics unavailable for this track  ♪")]
+
+            y = 266 + max(0, (5 - len(visible)) * 12)
+            for index, line in visible[:5]:
+                color = pink if index == active else (white if index >= 0 else muted)
+                text = trim_to_width(line, lyric_font, 410)
+                draw.text((480, y), text, fill=color, font=lyric_font)
+                y += 31
+
+            duration = max(0, int(getattr(song, "duration_sec", 0) or 0))
+            x1, x2, bar_y = 480, 885, 454
+            draw.rounded_rectangle((x1, bar_y, x2, bar_y + 5), radius=3, fill=(64, 71, 99, 255))
+            progress = min(1.0, position / duration) if duration else 0.0
+            fill_x = x1 + int((x2 - x1) * progress)
+            draw.rounded_rectangle((x1, bar_y, max(x1 + 1, fill_x), bar_y + 5), radius=3, fill=pink)
+            def stamp(seconds):
+                seconds = max(0, int(seconds))
+                return f"{seconds // 60:02d}:{seconds % 60:02d}"
+            draw.text((480, 468), stamp(position), fill=white, font=small_font)
+            draw.text((825, 468), stamp(duration), fill=muted, font=small_font)
+
+            output = f"cache/{song.id}_live_v8_{int(position // 8)}.png"
+            frame.save(output)
+            return output
+        except Exception:
+            return base
+
     def _generate_sync(
         self,
         temp: str,
@@ -149,161 +279,201 @@ class Thumbnail:
     ) -> str:
 
         try:
-            # --------------------------------------------------
-            # Reference-style music player card.
-            # The source thumbnail is used as the album/video art
-            # while the rest of the player UI is rendered locally.
-            # --------------------------------------------------
-            with Image.open(temp) as temp_img:
-                source = temp_img.convert("RGB")
-                # Keep the original thumbnail aspect ratio so the full
-                # song image is visible without stretching or cropping.
-                base = ImageOps.fit(source, size, method=Image.Resampling.LANCZOS)
+            # Premium reference-style music card.
+            # Keep the existing 930x523 output size; all visual positions
+            # below are scaled to match the supplied reference image.
+            player_w, player_h = 930, 523
 
-            # Blurred background.
-            bg = base.filter(ImageFilter.GaussianBlur(32))
-            bg = ImageEnhance.Brightness(bg).enhance(0.32)
-            bg = ImageEnhance.Contrast(bg).enhance(1.15)
-            bg = bg.convert("RGBA")
+            with Image.open(temp) as src:
+                source = src.convert("RGBA")
 
-            # Main rounded player surface.
-            card = Image.new("RGBA", (1140, 610), (24, 35, 47, 238))
-            mask = Image.new("L", card.size, 0)
-            ImageDraw.Draw(mask).rounded_rectangle(
-                (0, 0, 1139, 609),
-                radius=34,
-                fill=255,
-            )
-            bg.alpha_composite(card, (70, 55))
+                # One fixed background for the entire card.
+                bg_color = (14, 20, 43, 255)
+                card = Image.new("RGBA", (player_w, player_h), bg_color)
+                draw = ImageDraw.Draw(card)
 
-            draw = ImageDraw.Draw(bg)
+                # Soft inner highlight, while keeping the background color fixed.
+                # Clean card: no visible outer border.
 
-            # Album/video art: preserve the complete source image.
-            art_w, art_h = 500, 282
-            art_x, art_y = 105, 145
-            art = ImageOps.contain(
-                source,
-                (art_w, art_h),
-                method=Image.Resampling.LANCZOS,
-            )
-            art_canvas = Image.new("RGB", (art_w, art_h), (18, 25, 34))
-            art_canvas.paste(
-                art,
-                ((art_w - art.width) // 2, (art_h - art.height) // 2),
-            )
-            art_mask = Image.new("L", art_canvas.size, 0)
-            ImageDraw.Draw(art_mask).rounded_rectangle(
-                (0, 0, art_w - 1, art_h - 1),
-                radius=26,
-                fill=255,
-            )
-            bg.paste(art_canvas, (art_x, art_y), art_mask)
 
-            # Fonts.
-            title_font = self.title_font
-            regular_font = self.regular_font
-            icon_font = ImageFont.truetype(
-                "Elevenyts/helpers/Raleway-Bold.ttf",
-                34,
-            )
+                # Artwork: TRUE SQUARE cover.
+                # The player always shows a 1:1 cover area.  The source is
+                # proportionally resized and softly extended to the square
+                # so the cover never becomes a visible 16:9 rectangle.
+                art_size = 390
+                art_x, art_y = 36, 66
 
-            clean_title = re.sub(r"\s+", " ", song.title).strip()
-            final_title = trim_to_width(
-                clean_title,
-                title_font,
-                610,
-            )
+                # Build a square background from the same artwork.
+                square_bg = ImageOps.fit(
+                    source,
+                    (art_size, art_size),
+                    method=Image.Resampling.LANCZOS,
+                    centering=(0.5, 0.5)
+                )
+                square_bg = square_bg.filter(ImageFilter.GaussianBlur(10))
+                square_bg = ImageEnhance.Color(square_bg).enhance(0.9)
+                square_bg = ImageEnhance.Brightness(square_bg).enhance(0.72)
 
-            # Right-side title and source.
-            text_x = 575
-            draw.text(
-                (text_x + 2, 170 + 2),
-                final_title,
-                fill=(0, 0, 0, 180),
-                font=title_font,
-            )
-            draw.text(
-                (text_x, 170),
-                final_title,
-                fill=(255, 255, 255, 255),
-                font=title_font,
-            )
+                # Put the complete original artwork over the square canvas.
+                # No stretching: its aspect ratio is preserved.
+                art = ImageOps.contain(
+                    source,
+                    (art_size, art_size),
+                    method=Image.Resampling.LANCZOS
+                )
+                art = ImageEnhance.Color(art).enhance(1.05)
 
-            draw.text(
-                (text_x, 225),
-                "NOW PLAYING",
-                fill=(175, 190, 205, 255),
-                font=regular_font,
-            )
+                art_box = square_bg.copy()
+                ax = (art_size - art.width) // 2
+                ay = (art_size - art.height) // 2
+                art_box.alpha_composite(art, (ax, ay))
 
-            # Progress bar.
-            bar_x = text_x
-            bar_y = 345
-            bar_w = 470
+                art_mask = Image.new("L", (art_size, art_size), 0)
+                ImageDraw.Draw(art_mask).rounded_rectangle(
+                    (0, 0, art_size - 1, art_size - 1),
+                    radius=22,
+                    fill=255
+                )
+                card.paste(art_box, (art_x, art_y), art_mask)
 
-            draw.rounded_rectangle(
-                (bar_x, bar_y, bar_x + bar_w, bar_y + 7),
-                radius=4,
-                fill=(92, 105, 118, 255),
-            )
-            draw.rounded_rectangle(
-                (bar_x, bar_y, bar_x + 95, bar_y + 7),
-                radius=4,
-                fill=(235, 238, 242, 255),
-            )
-            draw.ellipse(
-                (bar_x + 87, bar_y - 5, bar_x + 101, bar_y + 9),
-                fill=(255, 255, 255, 255),
-            )
+                # Right-side song information — scaled to the supplied
+                # reference image.  The artwork block above is intentionally
+                # untouched.
+                rx = 480
+                rw = player_w - rx - 42
 
-            draw.text(
-                (bar_x, bar_y + 20),
-                "0:00",
-                fill=(190, 200, 210, 255),
-                font=regular_font,
-            )
-            draw.text(
-                (bar_x + bar_w - 65, bar_y + 20),
-                song.duration,
-                fill=(190, 200, 210, 255),
-                font=regular_font,
-            )
-
-            # Player controls matching the reference image.
-            controls = [
-                ("|<<", 650),
-                ("Ⅱ", 755),
-                (">>|", 860),
-            ]
-            for label, x in controls:
-                draw.text(
-                    (x, 420),
-                    label,
-                    fill=(245, 248, 250, 255),
-                    font=icon_font,
+                now_font = ImageFont.truetype(
+                    "Elevenyts/helpers/Raleway-Bold.ttf", 24
+                )
+                title_font = ImageFont.truetype(
+                    "Elevenyts/helpers/Raleway-Bold.ttf", 44
+                )
+                artist_font = ImageFont.truetype(
+                    "Elevenyts/helpers/Inter-Light.ttf", 31
+                )
+                small_font = ImageFont.truetype(
+                    "Elevenyts/helpers/Inter-Light.ttf", 24
                 )
 
-            draw.text(
-                (text_x, 485),
-                "🔊",
-                fill=(220, 230, 240, 255),
-                font=regular_font,
-            )
-            draw.rounded_rectangle(
-                (text_x + 45, 498, text_x + 540, 504),
-                radius=3,
-                fill=(95, 108, 120, 255),
-            )
+                accent = (255, 82, 157, 255)
+                artist_color = (255, 164, 204, 255)
+                muted = (164, 173, 202, 255)
+                white = (250, 252, 251, 255)
+                dark = (14, 20, 43, 255)
 
-            # Small signature, matching the existing bot branding area.
-            draw.text(
-                (105, 92),
-                "APPLE MUSIC <<3",
-                fill=(255, 255, 255, 230),
-                font=self.signature_font,
-            )
+                draw.text(
+                    (rx, 102),
+                    "NOW PLAYING",
+                    fill=accent,
+                    font=now_font
+                )
 
-            bg.convert("RGB").save(output, quality=95)
+                title = trim_to_width(
+                    str(song.title or "Unknown Track"),
+                    title_font,
+                    rw
+                )
+                artist = trim_to_width(
+                    str(song.channel_name or "Apple Musix"),
+                    artist_font,
+                    rw
+                )
+
+                draw.text(
+                    (rx, 151),
+                    title,
+                    fill=white,
+                    font=title_font
+                )
+
+                draw.text(
+                    (rx, 218),
+                    artist,
+                    fill=artist_color,
+                    font=artist_font
+                )
+
+                duration = str(getattr(song, "duration", "") or "")
+                duration_label = (
+                    f"Duration  •  {duration}"
+                    if duration
+                    else "Duration  •  --:--"
+                )
+                draw.text(
+                    (rx, 273),
+                    duration_label,
+                    fill=muted,
+                    font=small_font
+                )
+
+                # Compact reference-style Play pill.
+                pill_x, pill_y = rx, 331
+                pill_w, pill_h = 230, 58
+
+                draw.rounded_rectangle(
+                    (pill_x, pill_y, pill_x + pill_w, pill_y + pill_h),
+                    radius=29,
+                    fill=accent
+                )
+
+                py = pill_y + pill_h // 2
+                draw.polygon(
+                    [
+                        (pill_x + 48, py - 15),
+                        (pill_x + 48, py + 15),
+                        (pill_x + 75, py)
+                    ],
+                    fill=dark
+                )
+
+                draw.text(
+                    (pill_x + 103, pill_y + 8),
+                    "Play",
+                    fill=dark,
+                    font=ImageFont.truetype(
+                        "Elevenyts/helpers/Raleway-Bold.ttf", 28
+                    )
+                )
+
+                # Reference music icon in the upper-right corner.
+                mx, my = player_w - 88, 52
+                draw.rectangle(
+                    (mx - 2, my + 12, mx + 4, my + 50),
+                    fill=accent
+                )
+                draw.rectangle(
+                    (mx + 20, my + 5, mx + 26, my + 43),
+                    fill=accent
+                )
+                draw.polygon(
+                    [
+                        (mx - 2, my + 12),
+                        (mx + 26, my + 5),
+                        (mx + 26, my + 14),
+                        (mx - 2, my + 21)
+                    ],
+                    fill=accent
+                )
+                draw.ellipse(
+                    (mx - 16, my + 43, mx + 6, my + 59),
+                    fill=accent
+                )
+                draw.ellipse(
+                    (mx + 9, my + 36, mx + 31, my + 52),
+                    fill=accent
+                )
+
+                # Rounded outer card.
+                mask = Image.new("L", card.size, 0)
+                ImageDraw.Draw(mask).rounded_rectangle(
+                    (0, 0, player_w - 1, player_h - 1),
+                    radius=30,
+                    fill=255
+                )
+
+                final = Image.new("RGBA", (player_w, player_h), bg_color)
+                final.paste(card, (0, 0), mask)
+                final.save(output)
 
             try:
                 os.remove(temp)
@@ -311,6 +481,9 @@ class Thumbnail:
                 pass
 
             return output
+
+
+
 
         except Exception:
             return config.DEFAULT_THUMB

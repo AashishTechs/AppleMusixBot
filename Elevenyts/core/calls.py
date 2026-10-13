@@ -71,6 +71,7 @@ class TgCall(PyTgCalls):
         # Monotonic timestamps used to keep Media.time accurate while
         # playback is running. This makes /seekback use the real position.
         self._playback_started_at = {}
+        self._player_update_tasks = {}
 
     # ======================================================
     # Telegram message helpers
@@ -170,6 +171,44 @@ class TgCall(PyTgCalls):
         except Exception:
             return None
 
+    async def _update_player_card(
+        self,
+        chat_id: int,
+        target_chat_id: int,
+        media: Track,
+        message_id: int,
+    ):
+        """Refresh synced lyrics and progress without touching playback."""
+        try:
+            lyrics = await thumb.fetch_synced_lyrics(media)
+            while True:
+                await asyncio.sleep(8)
+                current = queue.get_current(chat_id)
+                if not current or str(getattr(current, "id", "")) != str(media.id):
+                    break
+                if not await db.playing(chat_id):
+                    continue
+                position = await self.current_time(chat_id)
+                frame_path = await thumb.generate_live_frame(media, position, lyrics)
+                try:
+                    message_obj = await app.get_messages(target_chat_id, message_id)
+                    if not message_obj or getattr(message_obj, "empty", False):
+                        break
+                    await self._edit_media_with_retry(
+                        message_obj,
+                        InputMediaPhoto(
+                            media=frame_path,
+                            caption=message_obj.caption or "",
+                        ),
+                        message_obj.reply_markup,
+                    )
+                except Exception as exc:
+                    logger.debug("Player card refresh failed in %s: %s", chat_id, exc)
+        except asyncio.CancelledError:
+            pass
+        except Exception as exc:
+            logger.debug("Live lyrics updater stopped in %s: %s", chat_id, exc)
+
     # ======================================================
     # Direct stream URL helper
     # ======================================================
@@ -213,6 +252,26 @@ class TgCall(PyTgCalls):
                 f"Could not extract direct stream URL for {media.id}"
             )
 
+            # YouTube sometimes exposes only a combined A/V format (for
+            # example itag 18) to yt-dlp. That is not reliable for the
+            # audio-only PyTgCalls stream, so fall back to a local download.
+            # Live streams cannot be downloaded this way and must use a
+            # direct stream URL.
+            if not getattr(media, "is_live", False):
+                fallback_path = await yt.download_via_cookies(
+                    media.id,
+                    video=getattr(media, "video", False),
+                )
+                if fallback_path and fallback_path != "":
+                    media.file_path = fallback_path
+                    media.stream_headers = {}
+                    logger.info(
+                        "Using downloaded fallback media for %s (%s)",
+                        media.id,
+                        fallback_path,
+                    )
+                    return fallback_path
+
             return None
 
         except Exception as e:
@@ -220,6 +279,34 @@ class TgCall(PyTgCalls):
                 f"Direct stream extraction failed for {media.id}: {e}",
                 exc_info=True,
             )
+
+            # A transient extraction exception should not immediately fail
+            # /play when the cookie-based downloader can still retrieve the
+            # media. Do not attempt this for live streams.
+            if not getattr(media, "is_live", False):
+                try:
+                    fallback_path = await yt.download_via_cookies(
+                        media.id,
+                        video=getattr(media, "video", False),
+                    )
+                    if fallback_path:
+                        media.file_path = fallback_path
+                        media.stream_headers = {}
+                        logger.info(
+                            "Using downloaded fallback media after extraction error "
+                            "for %s (%s)",
+                            media.id,
+                            fallback_path,
+                        )
+                        return fallback_path
+                except Exception as fallback_error:
+                    logger.error(
+                        "Cookie download fallback failed for %s: %s",
+                        media.id,
+                        fallback_error,
+                        exc_info=True,
+                    )
+
             return None
 
     # ======================================================
@@ -444,33 +531,36 @@ class TgCall(PyTgCalls):
         # --------------------------------------------------
         # Direct stream URL
         #
-        # If file_path is empty, generate a fresh URL.
+        # YouTube URLs are temporary and may already have expired
+        # while a track waited in the queue. Always resolve a fresh
+        # URL (or a fresh preloaded URL) immediately before playback;
+        # do not trust media.file_path merely because it is non-empty.
         # --------------------------------------------------
 
-        if not media.file_path:
+        media.file_path = None
+        media.stream_headers = None
+        stream_url = await self._get_stream_url(media)
 
-            stream_url = await self._get_stream_url(media)
+        if not stream_url:
+            if thumb_task:
+                thumb_task.cancel()
 
-            if not stream_url:
-                if thumb_task:
-                    thumb_task.cancel()
-
-                if message:
-                    try:
-                        await message.edit_text(
-                            _lang["error_no_file"].format(
-                                config.SUPPORT_CHAT
-                            )
+            if message:
+                try:
+                    await message.edit_text(
+                        _lang["error_no_file"].format(
+                            config.SUPPORT_CHAT
                         )
-                    except Exception:
-                        pass
-
-                else:
-                    logger.error(
-                        f"No direct stream URL for media in {chat_id}"
                     )
+                except Exception:
+                    pass
 
-                return
+            else:
+                logger.error(
+                    f"No direct stream URL for media in {chat_id}"
+                )
+
+            return
 
         # --------------------------------------------------
         # Validate chat
@@ -952,6 +1042,18 @@ class TgCall(PyTgCalls):
 
                 if sent_photo:
                     media.message_id = sent_photo.id
+                    if isinstance(media, Track):
+                        previous_task = self._player_update_tasks.pop(chat_id, None)
+                        if previous_task and not previous_task.done():
+                            previous_task.cancel()
+                        self._player_update_tasks[chat_id] = asyncio.create_task(
+                            self._update_player_card(
+                                chat_id,
+                                target_chat_for_messages,
+                                media,
+                                sent_photo.id,
+                            )
+                        )
 
                 # ------------------------------------------------
                 # Start preload manager.
