@@ -621,6 +621,12 @@ class YouTube:
                 options["extractor_args"] = {
                     "youtube": {"player_client": [player_client]}
                 }
+                # Keep each fallback bounded so one blocked client does not
+                # consume the entire /play extraction timeout.
+                options["socket_timeout"] = 12
+                options["retries"] = 1
+                options["fragment_retries"] = 1
+                options["extractor_retries"] = 2
                 options.pop("cookiefile", None)
                 if use_cookies and cookie:
                     options["cookiefile"] = cookie
@@ -648,7 +654,7 @@ class YouTube:
 
                     formats = info.get("formats") or []
                     for fmt in reversed(formats):
-                        if not fmt.get("url") or fmt.get("acodec") in (None, "none"):
+                        if not fmt.get("url") or fmt.get("acodec") == "none":
                             continue
                         if not video and fmt.get("vcodec") != "none":
                             continue
