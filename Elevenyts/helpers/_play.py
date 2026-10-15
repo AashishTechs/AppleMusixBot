@@ -24,6 +24,13 @@ logger = logging.getLogger(__name__)
 
 def checkUB(play):
     async def _wrapper_impl(_, m: types.Message):
+        logger.info(
+            "Received play command in chat=%s user=%s command=%s",
+            getattr(getattr(m, "chat", None), "id", None),
+            getattr(getattr(m, "from_user", None), "id", None),
+            getattr(m, "command", None),
+        )
+
         async def safe_reply(text):
             """Safely send reply, return None if chat doesn't allow messages"""
             try:
@@ -272,7 +279,7 @@ def checkUB(play):
                 try:
                     await app.send_message(
                         chat_id,
-                        "<blockquote>❌ <b>Could not start playback.</b>\\n\\n"
+                        "<blockquote>❌ <b>Could not start playback.</b>\n\n"
                         "An internal error occurred before music search started. "
                         "The error has been logged; please try again shortly.</blockquote>",
                     )
