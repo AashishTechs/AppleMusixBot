@@ -585,52 +585,18 @@ class YouTube:
 
         ydl_opts = self._get_ydl_opts()
 
-        # ------------------------------------------------------
-        # Cookies
-        # ------------------------------------------------------
-
-        if cookie:
-
-            ydl_opts["cookiefile"] = cookie
-
-        # ======================================================
-        # AUDIO STREAM
-        # ======================================================
-
+        # Prefer a web request with cookies, then try other YouTube
+        # clients which may expose audio-only formats when the web
+        # client only returns combined audio/video formats.
         if not video:
-
-            # Select audio-only formats. Avoid falling back to "best",
-            # which can select a combined video/audio format.
-            ydl_opts["format"] = (
-                "bestaudio[ext=m4a][acodec!=none]/"
-                "bestaudio[acodec!=none]/"
-                "bestaudio"
-            )
-
-        # ======================================================
-        # VIDEO STREAM
-        # ======================================================
-
+            ydl_opts["format"] = "bestaudio[ext=m4a]/bestaudio"
         else:
-
             height_filter = ""
-
-            if (
-                self._max_video_height
-                and self._max_video_height > 0
-            ):
-
-                height_filter = (
-                    f"[height<="
-                    f"{self._max_video_height}]"
-                )
-
+            if self._max_video_height and self._max_video_height > 0:
+                height_filter = f"[height<={self._max_video_height}]"
             ydl_opts["format"] = (
-                f"best[ext=mp4]"
-                f"{height_filter}/"
-                f"best"
-                f"{height_filter}/"
-                "best"
+                f"best[ext=mp4]{height_filter}/"
+                f"best{height_filter}/best"
             )
 
         # ======================================================
@@ -638,108 +604,98 @@ class YouTube:
         # ======================================================
 
         def _extract():
+            # The web client can be restricted to a combined format on
+            # some videos. Try alternate clients instead of immediately
+            # failing /play. Cookie files are only used with the web
+            # client; other clients may reject cookie authentication.
+            profiles = [
+                ("web", True),
+                ("web_safari", False),
+                ("android_vr", False),
+                ("ios", False),
+            ]
+            errors_seen = []
 
-            try:
+            for player_client, use_cookies in profiles:
+                options = dict(ydl_opts)
+                options["extractor_args"] = {
+                    "youtube": {"player_client": [player_client]}
+                }
+                # Keep each fallback bounded so one blocked client does not
+                # consume the entire /play extraction timeout.
+                options["socket_timeout"] = 12
+                options["retries"] = 1
+                options["fragment_retries"] = 1
+                options["extractor_retries"] = 2
+                options.pop("cookiefile", None)
+                if use_cookies and cookie:
+                    options["cookiefile"] = cookie
 
-                with yt_dlp.YoutubeDL(
-                    ydl_opts
-                ) as ydl:
+                try:
+                    with yt_dlp.YoutubeDL(options) as ydl:
+                        info = ydl.extract_info(url, download=False)
 
-                    info = ydl.extract_info(
-                        url,
-                        download=False
+                    if not info:
+                        continue
+
+                    # YouTube may return a selected direct format at the
+                    # top level or only list it under "formats".
+                    direct_url = info.get("url")
+                    audio_only = (
+                        info.get("acodec") not in (None, "none")
+                        and info.get("vcodec") == "none"
                     )
 
-                if not info:
-
-                    return None
-
-                # --------------------------------------------------
-                # Direct URL
-                # --------------------------------------------------
-
-                direct_url = info.get("url")
-
-                # Preserve the request headers returned by yt-dlp. Some
-                # Googlevideo URLs require the same User-Agent as extraction.
-                if direct_url and (
-                    video or info.get("acodec") != "none"
-                ):
-                    return {
-                        "url": direct_url,
-                        "headers": dict(info.get("http_headers") or {}),
-                    }
-
-                # --------------------------------------------------
-                # Formats fallback
-                # --------------------------------------------------
-
-                formats = info.get(
-                    "formats",
-                    []
-                )
-
-                # Audio-only formats first.
-                if not video:
-
-                    for fmt in reversed(formats):
-
-                        if (
-                            fmt.get("acodec")
-                            != "none"
-                            and fmt.get("vcodec")
-                            == "none"
-                            and fmt.get("url")
-                        ):
-
-                            return {
-                                "url": fmt["url"],
-                                "headers": dict(fmt.get("http_headers") or info.get("http_headers") or {}),
-                            }
-
-                # Fallback formats. Audio playback must remain audio-only;
-                # a combined MP4 is not a safe fallback for voice-chat audio.
-                for fmt in reversed(formats):
-
-                    if (
-                        fmt.get("url")
-                        and fmt.get("acodec") != "none"
-                        and (
-                            video
-                            or fmt.get("vcodec") == "none"
-                        )
-                    ):
-
+                    if direct_url and (video or audio_only):
                         return {
-                            "url": fmt["url"],
-                            "headers": dict(fmt.get("http_headers") or info.get("http_headers") or {}),
+                            "url": direct_url,
+                            "headers": dict(info.get("http_headers") or {}),
                         }
 
-                # --------------------------------------------------
-                # Manifest fallback
-                # --------------------------------------------------
+                    formats = info.get("formats") or []
+                    for fmt in reversed(formats):
+                        if not fmt.get("url") or fmt.get("acodec") == "none":
+                            continue
+                        if not video and fmt.get("vcodec") != "none":
+                            continue
+                        return {
+                            "url": fmt["url"],
+                            "headers": dict(
+                                fmt.get("http_headers")
+                                or info.get("http_headers")
+                                or {}
+                            ),
+                        }
 
-                manifest_url = info.get(
-                    "manifest_url"
-                )
+                    if video and info.get("manifest_url"):
+                        return {
+                            "url": info["manifest_url"],
+                            "headers": dict(info.get("http_headers") or {}),
+                        }
 
-                if manifest_url:
+                    logger.warning(
+                        "YouTube client %s returned no usable %s format for %s",
+                        player_client,
+                        "video" if video else "audio-only",
+                        video_id,
+                    )
 
-                    return {
-                        "url": manifest_url,
-                        "headers": dict(info.get("http_headers") or {}),
-                    }
+                except Exception as exc:
+                    errors_seen.append(f"{player_client}: {exc}")
+                    logger.warning(
+                        "YouTube extraction via client %s failed for %s: %s",
+                        player_client,
+                        video_id,
+                        exc,
+                    )
 
-                return None
-
-            except Exception as e:
-
+            if errors_seen:
                 logger.error(
-                    f"❌ Direct stream extraction "
-                    f"failed for {video_id}: {e}"
+                    "All YouTube extraction profiles failed for %s: %s",
+                    video_id,
+                    " | ".join(errors_seen[-4:]),
                 )
-
-                return None
+            return None
 
         # ======================================================
         # RUN EXTRACTION WITHOUT BLOCKING BOT
