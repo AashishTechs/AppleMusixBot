@@ -176,6 +176,13 @@ async def play_hndlr(
     video: bool = False,
 ) -> None:
 
+    logger.info(
+        "/play handler entered: chat=%s user=%s command=%s",
+        getattr(getattr(m, "chat", None), "id", None),
+        getattr(getattr(m, "from_user", None), "id", None),
+        getattr(m, "command", None),
+    )
+
     try:
         await m.delete()
     except Exception:
