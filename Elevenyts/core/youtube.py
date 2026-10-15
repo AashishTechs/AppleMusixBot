@@ -585,12 +585,12 @@ class YouTube:
 
         ydl_opts = self._get_ydl_opts()
 
-        # Match the known-working VPS extraction profile. The default
-        # yt-dlp YouTube client can expose audio-only formats with cookies,
-        # while the implicit client selection may return no matching format.
+        # Use the web player profile verified on the VPS. Keep explicit
+        # audio-only format selection and the codec validation below so a
+        # combined audio/video format is never passed to voice-chat playback.
         ydl_opts["extractor_args"] = {
             "youtube": {
-                "player_client": ["default"],
+                "player_client": ["web"],
             }
         }
 
