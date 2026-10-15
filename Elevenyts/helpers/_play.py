@@ -23,7 +23,14 @@ logger = logging.getLogger(__name__)
 
 
 def checkUB(play):
-    async def wrapper(_, m: types.Message):
+    async def _wrapper_impl(_, m: types.Message):
+        logger.info(
+            "Received play command in chat=%s user=%s command=%s",
+            getattr(getattr(m, "chat", None), "id", None),
+            getattr(getattr(m, "from_user", None), "id", None),
+            getattr(m, "command", None),
+        )
+
         async def safe_reply(text):
             """Safely send reply, return None if chat doesn't allow messages"""
             try:
@@ -255,5 +262,34 @@ def checkUB(play):
                 "Please try the command again.</blockquote>"
             )
             return
+
+    async def wrapper(_, m: types.Message):
+        """Keep preflight failures visible instead of silently dropping /play."""
+        try:
+            return await _wrapper_impl(_, m)
+        except Exception as e:
+            chat_id = getattr(getattr(m, "chat", None), "id", None)
+            logger.error(
+                "Unhandled /play preflight failure in chat %s: %s",
+                chat_id,
+                e,
+                exc_info=True,
+            )
+            if chat_id is not None:
+                try:
+                    await app.send_message(
+                        chat_id,
+                        "<blockquote>❌ <b>Could not start playback.</b>\n\n"
+                        "An internal error occurred before music search started. "
+                        "The error has been logged; please try again shortly.</blockquote>",
+                    )
+                except Exception as send_error:
+                    logger.error(
+                        "Could not send /play failure notice in chat %s: %s",
+                        chat_id,
+                        send_error,
+                        exc_info=True,
+                    )
+            return None
 
     return wrapper
