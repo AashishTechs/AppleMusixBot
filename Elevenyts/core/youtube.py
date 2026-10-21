@@ -1104,10 +1104,12 @@ class YouTube:
                 ydl_opts = {
                     **base_opts,
 
+                    # Require an audio-only format; do not download a
+                    # combined video/audio file for voice-chat audio.
                     "format":
                         "bestaudio[ext=m4a]/"
                         "bestaudio[acodec=opus]/"
-                        "bestaudio/best",
+                        "bestaudio",
                 }
 
             if cookie:
@@ -1684,12 +1686,10 @@ class YouTube:
     ) -> Optional[str]:
 
         """
-        Legacy compatibility method.
+        Download a regular track to a local file.
 
-        New playback should use get_stream_url().
-
-        This method is retained because other older parts
-        of the project may still depend on it.
+        The API is tried first when configured; yt-dlp cookie-based
+        downloading is the normal fallback when the API is unavailable.
         """
 
         result = None
@@ -1730,13 +1730,8 @@ class YouTube:
     ) -> Optional[str]:
 
         """
-        Legacy compatibility method.
-
-        IMPORTANT:
-        New direct playback uses get_stream_url().
-
-        This method is kept temporarily so older project
-        components do not break.
+        Return a local downloaded file for normal tracks.
+        Live streams continue to return a temporary stream URL.
         """
 
         if is_live:
