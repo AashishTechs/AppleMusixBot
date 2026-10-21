@@ -113,42 +113,6 @@ def playlist_to_queue(chat_id: int, tracks: list) -> str:
     return text
 
 
-async def get_direct_stream(file):
-    """
-    Extract a direct streaming URL.
-
-    IMPORTANT:
-    This does NOT download MP3/MP4.
-
-    The URL is generated only when the track is about to play,
-    because YouTube stream URLs can expire.
-    """
-
-    try:
-        stream_info = await yt.get_stream_info(
-            file.id,
-            is_live=file.is_live,
-            video=getattr(file, "video", False),
-        )
-
-        if stream_info and stream_info.get("url"):
-            file.file_path = stream_info["url"]
-            file.stream_headers = stream_info.get("headers") or {}
-            return file.file_path
-
-        logger.error(
-            f"Could not extract direct stream URL for: {file.id}"
-        )
-
-        return None
-
-    except Exception as e:
-        logger.error(
-            f"Direct stream extraction failed for {file.id}: {e}"
-        )
-        return None
-
-
 @app.on_message(
     filters.command(
         [

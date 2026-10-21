@@ -57,31 +57,12 @@ class PreloadManager:
         )
 
     async def start_preload(self, chat_id: int, count: int = 2):
-        """Extract stream URLs for the next queued tracks in the background."""
-        from Elevenyts import queue, yt
-
-        try:
-            upcoming_tracks = queue.peek_next(chat_id, count)
-
-            for track in upcoming_tracks:
-                track_id = getattr(track, "id", None)
-                if not track_id or self.get_cached_url(track_id):
-                    continue
-
-                task = asyncio.create_task(
-                    self._preload_track(chat_id, track, yt)
-                )
-                self.tasks.setdefault(chat_id, set()).add(task)
-
-                def _done(done_task, cid=chat_id):
-                    self.tasks.get(cid, set()).discard(done_task)
-
-                task.add_done_callback(_done)
-
-        except Exception as e:
-            logger.error(
-                f"Preload manager error in chat {chat_id}: {e}"
-            )
+        """
+        URL preloading is disabled because regular tracks are downloaded
+        and played from local files. Kept as a no-op for compatibility
+        with older callers that still schedule this method.
+        """
+        return
 
     async def _preload_track(self, chat_id: int, track, yt=None):
         """Extract and cache a temporary direct stream URL."""

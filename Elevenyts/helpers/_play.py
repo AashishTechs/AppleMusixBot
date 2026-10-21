@@ -38,7 +38,13 @@ def checkUB(play):
             except (errors.ChatWriteForbidden, errors.ChatSendPlainForbidden):
                 # Chat doesn't allow text messages - silently return
                 return None
-            except Exception:
+            except Exception as e:
+                logger.warning(
+                    "Could not send /play preflight reply in chat %s: %s",
+                    getattr(getattr(m, "chat", None), "id", None),
+                    e,
+                    exc_info=True,
+                )
                 return None
         
         if not m.from_user:
