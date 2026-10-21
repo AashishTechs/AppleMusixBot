@@ -456,9 +456,16 @@ class TgCall(PyTgCalls):
         # use a temporary network URL.
         # --------------------------------------------------
 
-        media.file_path = None
-        media.stream_headers = None
-        media_source = await self._get_media_source(media)
+        # Preserve already-downloaded Telegram uploads. A queued YouTube
+        # Track may contain an old URL, so only trust file_path when it is
+        # an existing local file.
+        if media.file_path and os.path.isfile(media.file_path):
+            media_source = media.file_path
+            media.stream_headers = {}
+        else:
+            media.file_path = None
+            media.stream_headers = None
+            media_source = await self._get_media_source(media)
 
         if not media_source:
             if thumb_task:
@@ -1643,7 +1650,7 @@ class TgCall(PyTgCalls):
                     )
 
                 # ==================================================
-                # Fresh direct stream URL
+                # Playback status message
                 # ==================================================
 
                 _lang = await lang.get_lang(
@@ -1652,37 +1659,6 @@ class TgCall(PyTgCalls):
 
                 msg = None
 
-                # --------------------------------------------------
-                # Use the preloaded URL when available. If it is missing
-                # or expired, _get_stream_url() generates a fresh one.
-                # --------------------------------------------------
-
-                cached_url = preload.get_cached_url(media.id)
-                if cached_url:
-                    media.file_path = cached_url
-                else:
-                    media.file_path = None
-
-                stream_url = await self._get_stream_url(
-                    media
-                )
-
-                if not stream_url:
-
-                    logger.error(
-                        f"Could not get direct stream URL "
-                        f"for next track {media.id}"
-                    )
-
-                    await self.stop(
-                        chat_id
-                    )
-
-                    return
-
-                # ==================================================
-                # Playback status message
-                # ==================================================
 
                 try:
 
