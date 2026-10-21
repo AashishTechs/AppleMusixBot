@@ -506,15 +506,39 @@ class TgCall(PyTgCalls):
             if thumb_task:
                 thumb_task.cancel()
 
+            error_text = _lang["error_no_file"].format(
+                config.SUPPORT_CHAT
+            )
+
             if message:
+                updated = False
                 try:
-                    await message.edit_text(
-                        _lang["error_no_file"].format(
-                            config.SUPPORT_CHAT
-                        )
-                    )
+                    await message.edit_text(error_text)
+                    updated = True
                 except Exception:
+                    # The searching indicator may be a sticker, which
+                    # cannot be edited into text. Replace it with a new
+                    # text message so the user never sees a silent failure.
                     pass
+
+                if not updated:
+                    try:
+                        await message.delete()
+                    except Exception:
+                        pass
+
+                    try:
+                        await app.send_message(
+                            chat_id=target_chat_for_messages,
+                            text=error_text,
+                        )
+                    except Exception as send_error:
+                        logger.error(
+                            "Could not send stream failure notice for %s in %s: %s",
+                            media.id,
+                            target_chat_for_messages,
+                            send_error,
+                        )
 
             else:
                 logger.error(
