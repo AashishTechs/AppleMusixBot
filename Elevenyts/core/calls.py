@@ -172,7 +172,7 @@ class TgCall(PyTgCalls):
             return None
 
     # ======================================================
-    # Direct stream URL helper
+    # Local download / live stream source helper
     # ======================================================
 
     async def _get_media_source(
@@ -507,7 +507,7 @@ class TgCall(PyTgCalls):
 
             else:
                 logger.error(
-                    f"No direct stream URL for media in {chat_id}"
+                    f"No playable media source for track {media.id} in {chat_id}"
                 )
 
             return
@@ -1348,8 +1348,8 @@ class TgCall(PyTgCalls):
             media.time = seconds
 
             # --------------------------------------------------
-            # Direct stream URLs can expire.
-            # Force a fresh URL before seeking.
+            # Re-resolve the local file before seeking. The download
+            # layer reuses a completed file instead of streaming a URL.
             # --------------------------------------------------
 
             media.file_path = None
