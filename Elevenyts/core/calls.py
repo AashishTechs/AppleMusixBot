@@ -13,6 +13,7 @@
 # ==========================================================
 
 import asyncio
+import os
 import logging
 import time
 
@@ -174,100 +175,62 @@ class TgCall(PyTgCalls):
     # Direct stream URL helper
     # ======================================================
 
-    async def _get_stream_url(
+    async def _get_media_source(
         self,
         media: Media | Track,
     ) -> str | None:
         """
-        Get a temporary direct streaming URL.
+        Return a local downloaded file for regular tracks.
 
-        IMPORTANT:
-        This does NOT download MP3/MP4 files.
-
-        YouTube direct URLs can expire, so the URL is generated
-        immediately before playback.
+        Live streams cannot be downloaded, so they continue to use a
+        temporary direct stream URL. Regular YouTube tracks do not use
+        direct stream URLs at all.
         """
-
         try:
-            # Use a freshly preloaded URL when available. This removes the
-            # YouTube extraction delay from /skip and automatic next-track play.
-            cached_stream = preload.get_cached_stream(media.id)
-            if cached_stream:
-                cached_url, cached_headers = cached_stream
-                media.file_path = cached_url
-                media.stream_headers = cached_headers
-                return cached_url
+            is_video = getattr(media, "video", False)
 
-            stream_info = await yt.get_stream_info(
-                media.id,
-                is_live=getattr(media, "is_live", False),
-                video=getattr(media, "video", False),
-            )
-
-            if stream_info and stream_info.get("url"):
-                media.file_path = stream_info["url"]
-                media.stream_headers = stream_info.get("headers") or {}
-                return media.file_path
-
-            logger.warning(
-                f"Could not extract direct stream URL for {media.id}"
-            )
-
-            # YouTube sometimes exposes only a combined A/V format (for
-            # example itag 18) to yt-dlp. That is not reliable for the
-            # audio-only PyTgCalls stream, so fall back to a local download.
-            # Live streams cannot be downloaded this way and must use a
-            # direct stream URL.
-            if not getattr(media, "is_live", False):
-                fallback_path = await yt.download_via_cookies(
+            if getattr(media, "is_live", False):
+                stream_info = await yt.get_stream_info(
                     media.id,
-                    video=getattr(media, "video", False),
+                    is_live=True,
+                    video=is_video,
                 )
-                if fallback_path and fallback_path != "":
-                    media.file_path = fallback_path
-                    media.stream_headers = {}
-                    logger.info(
-                        "Using downloaded fallback media for %s (%s)",
-                        media.id,
-                        fallback_path,
-                    )
-                    return fallback_path
+                if stream_info and stream_info.get("url"):
+                    media.file_path = stream_info["url"]
+                    media.stream_headers = stream_info.get("headers") or {}
+                    return media.file_path
 
+                logger.warning("Could not get live stream URL for %s", media.id)
+                return None
+
+            # yt.download() returns a local file path. It reuses an existing
+            # completed download where available, otherwise downloads it.
+            local_path = await yt.download(
+                media.id,
+                is_live=False,
+                video=is_video,
+            )
+
+            if local_path and os.path.isfile(local_path):
+                media.file_path = local_path
+                media.stream_headers = {}
+                logger.info(
+                    "Using downloaded media file for %s: %s",
+                    media.id,
+                    local_path,
+                )
+                return local_path
+
+            logger.error("Could not download local media file for %s", media.id)
             return None
 
         except Exception as e:
             logger.error(
-                f"Direct stream extraction failed for {media.id}: {e}",
+                "Could not prepare media source for %s: %s",
+                media.id,
+                e,
                 exc_info=True,
             )
-
-            # A transient extraction exception should not immediately fail
-            # /play when the cookie-based downloader can still retrieve the
-            # media. Do not attempt this for live streams.
-            if not getattr(media, "is_live", False):
-                try:
-                    fallback_path = await yt.download_via_cookies(
-                        media.id,
-                        video=getattr(media, "video", False),
-                    )
-                    if fallback_path:
-                        media.file_path = fallback_path
-                        media.stream_headers = {}
-                        logger.info(
-                            "Using downloaded fallback media after extraction error "
-                            "for %s (%s)",
-                            media.id,
-                            fallback_path,
-                        )
-                        return fallback_path
-                except Exception as fallback_error:
-                    logger.error(
-                        "Cookie download fallback failed for %s: %s",
-                        media.id,
-                        fallback_error,
-                        exc_info=True,
-                    )
-
             return None
 
     # ======================================================
@@ -446,11 +409,8 @@ class TgCall(PyTgCalls):
     ) -> None:
 
         """
-        Play media in Telegram voice chat.
-
-        media.file_path contains the direct stream URL.
-
-        No MP3/MP4 file is downloaded by this method.
+        Play downloaded local media in Telegram voice chat.
+        Only live streams use a direct stream URL.
         """
 
         client = await db.get_assistant(chat_id)
@@ -490,19 +450,17 @@ class TgCall(PyTgCalls):
             thumb_task = None
 
         # --------------------------------------------------
-        # Direct stream URL
+        # Prepare the media source.
         #
-        # YouTube URLs are temporary and may already have expired
-        # while a track waited in the queue. Always resolve a fresh
-        # URL (or a fresh preloaded URL) immediately before playback;
-        # do not trust media.file_path merely because it is non-empty.
+        # Normal tracks are downloaded to a local file. Only live streams
+        # use a temporary network URL.
         # --------------------------------------------------
 
         media.file_path = None
         media.stream_headers = None
-        stream_url = await self._get_stream_url(media)
+        media_source = await self._get_media_source(media)
 
-        if not stream_url:
+        if not media_source:
             if thumb_task:
                 thumb_task.cancel()
 
@@ -718,8 +676,21 @@ class TgCall(PyTgCalls):
         )
 
         # ==================================================
-        # Create direct network MediaStream
+        # Create local-file MediaStream for regular tracks.
+        # Live streams retain their required request headers.
         # ==================================================
+
+        is_local_file = os.path.isfile(media.file_path)
+        if is_local_file:
+            # HTTP reconnect options are not needed for a local file.
+            ffmpeg_params = (
+                (f"-ss {seek_time} " if seek_time > 1 else "")
+                + "-probesize 1M "
+                + "-analyzeduration 1M "
+                + "-rtbufsize 20M "
+                + "-thread_queue_size 4096 "
+                + "-fflags +genpts+igndts"
+            )
 
         stream = types.MediaStream(
             media_path=media.file_path,
@@ -727,7 +698,7 @@ class TgCall(PyTgCalls):
             audio_flags=types.MediaStream.Flags.REQUIRED,
             video_flags=video_flags,
             ffmpeg_parameters=ffmpeg_params,
-            headers=getattr(media, "stream_headers", None) or {},
+            headers={} if is_local_file else (getattr(media, "stream_headers", None) or {}),
         )
 
         # ==================================================
