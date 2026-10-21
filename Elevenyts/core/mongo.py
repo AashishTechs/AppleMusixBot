@@ -195,6 +195,10 @@ class MongoDB:
     async def get_assistant(self, chat_id: int):
         from Elevenyts import tune
 
+        # Do not assign a random assistant when no session is connected.
+        if not userbot.clients or not tune.clients:
+            return None
+
         if chat_id not in self.assistant:
             doc = await self.assistantdb.find_one({"_id": chat_id})
             num = doc["num"] if doc else await self.set_assistant(chat_id)
