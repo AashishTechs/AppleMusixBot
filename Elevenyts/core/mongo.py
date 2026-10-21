@@ -200,13 +200,20 @@ class MongoDB:
             num = doc["num"] if doc else await self.set_assistant(chat_id)
             self.assistant[chat_id] = num
 
-        # Check if assigned assistant is out of range (e.g., assistant was removed)
-        if self.assistant[chat_id] > len(userbot.clients):
-            # Reassign to a valid assistant
-            num = await self.set_assistant(chat_id)
-            self.assistant[chat_id] = num
+        # If sessions failed to start, there is no assistant to return.
+        if not userbot.clients or not tune.clients:
+            return None
 
-        return tune.clients[self.assistant[chat_id] - 1]
+        # Repair stale/corrupt assignments (e.g. old num=0 or removed sessions).
+        assistant_num = self.assistant.get(chat_id, 0)
+        if (
+            not isinstance(assistant_num, int)
+            or not 1 <= assistant_num <= min(len(userbot.clients), len(tune.clients))
+        ):
+            assistant_num = await self.set_assistant(chat_id)
+            self.assistant[chat_id] = assistant_num
+
+        return tune.clients[assistant_num - 1]
 
     async def get_client(self, chat_id: int):
         """
@@ -218,11 +225,15 @@ class MongoDB:
         slot-based lookup can return None even while a healthy assistant is
         running.
         """
-        if chat_id not in self.assistant:
-            await self.get_assistant(chat_id)
-
+        # Check this before get_assistant(): with zero live sessions, the
+        # old path tried randint(1, 0) and failed before it could report None.
         if not userbot.clients:
             return None
+
+        if chat_id not in self.assistant:
+            assistant = await self.get_assistant(chat_id)
+            if assistant is None:
+                return None
 
         # Reassign stale/out-of-range values to a currently running assistant.
         assistant_num = self.assistant.get(chat_id, 0)
