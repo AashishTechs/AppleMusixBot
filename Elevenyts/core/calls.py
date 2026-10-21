@@ -213,6 +213,26 @@ class TgCall(PyTgCalls):
                 f"Could not extract direct stream URL for {media.id}"
             )
 
+            # YouTube sometimes exposes only a combined A/V format (for
+            # example itag 18) to yt-dlp. That is not reliable for the
+            # audio-only PyTgCalls stream, so fall back to a local download.
+            # Live streams cannot be downloaded this way and must use a
+            # direct stream URL.
+            if not getattr(media, "is_live", False):
+                fallback_path = await yt.download_via_cookies(
+                    media.id,
+                    video=getattr(media, "video", False),
+                )
+                if fallback_path and fallback_path != "":
+                    media.file_path = fallback_path
+                    media.stream_headers = {}
+                    logger.info(
+                        "Using downloaded fallback media for %s (%s)",
+                        media.id,
+                        fallback_path,
+                    )
+                    return fallback_path
+
             return None
 
         except Exception as e:
@@ -220,6 +240,34 @@ class TgCall(PyTgCalls):
                 f"Direct stream extraction failed for {media.id}: {e}",
                 exc_info=True,
             )
+
+            # A transient extraction exception should not immediately fail
+            # /play when the cookie-based downloader can still retrieve the
+            # media. Do not attempt this for live streams.
+            if not getattr(media, "is_live", False):
+                try:
+                    fallback_path = await yt.download_via_cookies(
+                        media.id,
+                        video=getattr(media, "video", False),
+                    )
+                    if fallback_path:
+                        media.file_path = fallback_path
+                        media.stream_headers = {}
+                        logger.info(
+                            "Using downloaded fallback media after extraction error "
+                            "for %s (%s)",
+                            media.id,
+                            fallback_path,
+                        )
+                        return fallback_path
+                except Exception as fallback_error:
+                    logger.error(
+                        "Cookie download fallback failed for %s: %s",
+                        media.id,
+                        fallback_error,
+                        exc_info=True,
+                    )
+
             return None
 
     # ======================================================
@@ -444,33 +492,60 @@ class TgCall(PyTgCalls):
         # --------------------------------------------------
         # Direct stream URL
         #
-        # If file_path is empty, generate a fresh URL.
+        # YouTube URLs are temporary and may already have expired
+        # while a track waited in the queue. Always resolve a fresh
+        # URL (or a fresh preloaded URL) immediately before playback;
+        # do not trust media.file_path merely because it is non-empty.
         # --------------------------------------------------
 
-        if not media.file_path:
+        media.file_path = None
+        media.stream_headers = None
+        stream_url = await self._get_stream_url(media)
 
-            stream_url = await self._get_stream_url(media)
+        if not stream_url:
+            if thumb_task:
+                thumb_task.cancel()
 
-            if not stream_url:
-                if thumb_task:
-                    thumb_task.cancel()
+            error_text = _lang["error_no_file"].format(
+                config.SUPPORT_CHAT
+            )
 
-                if message:
+            if message:
+                updated = False
+                try:
+                    await message.edit_text(error_text)
+                    updated = True
+                except Exception:
+                    # The searching indicator may be a sticker, which
+                    # cannot be edited into text. Replace it with a new
+                    # text message so the user never sees a silent failure.
+                    pass
+
+                if not updated:
                     try:
-                        await message.edit_text(
-                            _lang["error_no_file"].format(
-                                config.SUPPORT_CHAT
-                            )
-                        )
+                        await message.delete()
                     except Exception:
                         pass
 
-                else:
-                    logger.error(
-                        f"No direct stream URL for media in {chat_id}"
-                    )
+                    try:
+                        await app.send_message(
+                            chat_id=target_chat_for_messages,
+                            text=error_text,
+                        )
+                    except Exception as send_error:
+                        logger.error(
+                            "Could not send stream failure notice for %s in %s: %s",
+                            media.id,
+                            target_chat_for_messages,
+                            send_error,
+                        )
 
-                return
+            else:
+                logger.error(
+                    f"No direct stream URL for media in {chat_id}"
+                )
+
+            return
 
         # --------------------------------------------------
         # Validate chat
