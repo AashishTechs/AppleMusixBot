@@ -1125,18 +1125,43 @@ class TgCall(PyTgCalls):
 
         except exceptions.NoAudioSourceFound:
 
+            # The searching indicator may be a sticker, which Telegram
+            # cannot edit into text. Replace it with a visible error notice
+            # instead of silently leaving the user with a stuck sticker.
+            error_text = _lang["error_no_audio"]
             if message:
-
+                updated = False
                 try:
-                    await message.edit_text(
-                        _lang["error_no_audio"]
-                    )
+                    await message.edit_text(error_text)
+                    updated = True
                 except Exception:
                     pass
 
-            await self.play_next(
-                chat_id
+                if not updated:
+                    try:
+                        await message.delete()
+                    except Exception:
+                        pass
+
+                    try:
+                        await app.send_message(
+                            chat_id=target_chat_for_messages,
+                            text=error_text,
+                        )
+                    except Exception as send_error:
+                        logger.error(
+                            "Could not send no-audio notice for chat %s: %s",
+                            target_chat_for_messages,
+                            send_error,
+                            exc_info=True,
+                        )
+
+            logger.error(
+                "PyTgCalls could not find an audio source for track %s in chat %s",
+                media.id,
+                chat_id,
             )
+            await self.play_next(chat_id)
 
         except (
             ConnectionNotFound,
