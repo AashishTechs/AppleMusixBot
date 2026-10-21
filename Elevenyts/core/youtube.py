@@ -248,7 +248,7 @@ class YouTube:
         # DENO
         # ------------------------------------------------------
 
-        if self.deno_path:        if self.deno_path:
+        if self.deno_path:
 
             options["js_runtimes"] = {
                 "deno": {
@@ -498,7 +498,7 @@ class YouTube:
                             logger.info(
                                 f"✅ Saved: "
                                 f"{cookie_filename} "
-                                f"({len(content)} bytes)"                                f"({len(content)} bytes)"
+                                f"({len(content)} bytes)"
                             )
 
             except asyncio.TimeoutError:
@@ -748,7 +748,7 @@ class YouTube:
                 f"{video_id}"
             )
 
-            return None            return None
+            return None
 
         except Exception as e:
 
@@ -998,7 +998,7 @@ class YouTube:
                 return audio_candidates[0]
 
         downloads_dir = Path(
-            "downloads"            "downloads"
+            "downloads"
         )
 
         downloads_dir.mkdir(
@@ -1499,7 +1499,7 @@ class YouTube:
             thumbnails = data.get("thumbnails") or []
             thumbnail = thumbnails[-1].get("url", "").split("?")[0] if thumbnails else ""
             duration = utils.format_duration(duration_sec)
-            title = (data.get("title") or "Unknown").strip()[:25]            title = (data.get("title") or "Unknown").strip()[:25]
+            title = (data.get("title") or "Unknown").strip()[:25]
             url = data.get("webpage_url") or data.get("url") or (self.base + item_id)
 
             tracks.append(Track(
@@ -1749,6 +1749,3 @@ class YouTube:
 
 # ==========================================================
 # GLOBAL YOUTUBE HANDLER
-# ==========================================================
-
-yt = YouTube()
