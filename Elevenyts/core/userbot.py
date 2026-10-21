@@ -92,7 +92,13 @@ class Userbot(Client):
         client.mention = client.me.mention if hasattr(
             client, 'me') and client.me else client.name
         self.clients.append(client)
-        logger.info(f"👤 Assistant {num} started as @{client.username}")
+        logger.info(
+            "👤 Assistant %s connected: id=%s name=%r username=%r",
+            num,
+            client.id,
+            client.name,
+            client.username,
+        )
 
     async def boot(self):
         """
