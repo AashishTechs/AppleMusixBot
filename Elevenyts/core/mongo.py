@@ -209,24 +209,29 @@ class MongoDB:
         return tune.clients[self.assistant[chat_id] - 1]
 
     async def get_client(self, chat_id: int):
+        """
+        Return the Pyrogram assistant assigned to this chat.
+
+        Assistant numbers stored in MongoDB are positional (1..N), matching
+        both userbot.clients and tune.clients. Do not map them to SESSION1/2/3
+        slot numbers: if one session fails or only SESSION2/3 is configured,
+        slot-based lookup can return None even while a healthy assistant is
+        running.
+        """
         if chat_id not in self.assistant:
             await self.get_assistant(chat_id)
-        
-        # Check if assigned assistant is out of range
-        if self.assistant[chat_id] > len(userbot.clients):
-            # Reassign to a valid assistant
-            await self.set_assistant(chat_id)
-        
-        # Get available clients dynamically based on what's actually running
-        available_clients = {}
-        if hasattr(userbot, 'one') and userbot.one in userbot.clients:
-            available_clients[1] = userbot.one
-        if hasattr(userbot, 'two') and userbot.two in userbot.clients:
-            available_clients[2] = userbot.two
-        if hasattr(userbot, 'three') and userbot.three in userbot.clients:
-            available_clients[3] = userbot.three
-        
-        return available_clients.get(self.assistant[chat_id])
+
+        if not userbot.clients:
+            return None
+
+        # Reassign stale/out-of-range values to a currently running assistant.
+        assistant_num = self.assistant.get(chat_id, 0)
+        if not isinstance(assistant_num, int) or not 1 <= assistant_num <= len(userbot.clients):
+            assistant_num = await self.set_assistant(chat_id)
+
+        # set_assistant() chooses from 1..len(userbot.clients), so use the
+        # same positional ordering as get_assistant() and TgCall.boot().
+        return userbot.clients[assistant_num - 1]
 
     # BLACKLIST METHODS
     async def add_blacklist(self, chat_id: int) -> None:
