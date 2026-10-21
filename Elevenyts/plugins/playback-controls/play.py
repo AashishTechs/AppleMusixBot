@@ -546,30 +546,11 @@ async def play_hndlr(
 
             return
 
-    if not file.file_path:
-
-        stream_url = await get_direct_stream(
-            file
-        )
-
-        if not stream_url:
-
-            await safe_edit(
-                sent,
-                "<blockquote>"
-                "❌ Failed to get direct stream.\n\n"
-                "Possible reasons:\n"
-                "• YouTube detected bot activity\n"
-                "• Video is region-blocked or private\n"
-                "• Age-restricted content\n"
-                "• YouTube stream is temporarily unavailable\n\n"
-                "Please update cookies in "
-                "`Elevenyts/cookies/` if required."
-                "</blockquote>",
-            )
-
-            return
-
+    # Resolve the stream inside tune.play_media(). Its stream resolver
+    # includes the cookie-download fallback; extracting it here first
+    # caused a second YouTube extraction and bypassed that fallback on
+    # failure. Keep the searching indicator until playback succeeds/fails.
+    
     try:
 
         logger.info(
