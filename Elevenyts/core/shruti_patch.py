@@ -8,6 +8,7 @@ falls back to the existing yt-dlp extractor.
 
 from __future__ import annotations
 
+import asyncio
 from urllib.parse import urlencode
 
 import aiohttp
