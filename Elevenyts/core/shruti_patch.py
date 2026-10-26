@@ -1,9 +1,9 @@
 """Safe Shruti direct-audio integration.
 
-This module wraps the existing YouTube stream extractor instead of replacing it.
-For normal YouTube audio tracks, Shruti is tried first. If the API is disabled,
-not configured, unavailable, or returns a non-media response, the original
-yt-dlp extraction path is used unchanged.
+Shruti is used only for ordinary YouTube audio tracks. The API response is
+followed and checked for a successful media response before it is handed to
+PyTgCalls. Any configuration, network, redirect, or content-validation failure
+falls back to the existing yt-dlp extractor.
 """
 
 from __future__ import annotations
@@ -15,18 +15,30 @@ import aiohttp
 from Elevenyts import config, logger
 
 
+_MEDIA_TYPES = ("audio/", "application/octet-stream", "binary/octet-stream")
+
+
 async def _probe(url: str) -> bool:
-    """Lightly validate the Shruti endpoint without downloading the song."""
+    """Validate that the Shruti endpoint resolves to a readable media response.
+
+    Only one byte is requested/read, so the probe does not intentionally
+    download the track. Redirects are followed so a redirect to an error page
+    or an invalid destination is not mistaken for a valid media stream.
+    """
     timeout = aiohttp.ClientTimeout(total=max(2, config.SHRUTI_TIMEOUT))
-    headers = {"Range": "bytes=0-1"}
+    headers = {"Range": "bytes=0-0"}
 
     try:
         async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.get(
                 url,
                 headers=headers,
-                allow_redirects=False,
+                allow_redirects=True,
+                max_redirects=5,
             ) as response:
+                if response.status not in {200, 206}:
+                    return False
+
                 content_type = (
                     response.headers.get("Content-Type", "")
                     .split(";", 1)[0]
@@ -34,23 +46,22 @@ async def _probe(url: str) -> bool:
                     .lower()
                 )
 
-                if response.status in {301, 302, 303, 307, 308}:
-                    return bool(response.headers.get("Location"))
-
-                if response.status not in {200, 206}:
+                if not any(content_type.startswith(kind) for kind in _MEDIA_TYPES):
                     return False
 
-                if content_type in {
-                    "application/json",
-                    "text/html",
-                    "text/plain",
-                }:
+                # Require a non-empty response. The Range header asks for a
+                # single byte; if the server ignores Range, close after one byte.
+                first_byte = await response.content.read(1)
+                if not first_byte:
                     return False
 
                 return True
 
+    except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
+        logger.debug("Shruti probe failed: %s", type(exc).__name__)
+        return False
     except Exception as exc:
-        logger.debug(f"Shruti probe failed: {exc}")
+        logger.debug("Shruti probe failed: %s", type(exc).__name__)
         return False
 
 
@@ -66,8 +77,11 @@ def _build_url(video_id: str) -> str:
 
 
 def install(youtube) -> None:
-    """Install Shruti as a safe first-choice audio source on the existing YouTube object."""
+    """Install Shruti as a first-choice source, preserving the original extractor."""
     original_get_stream_info = youtube.get_stream_info
+
+    # Keep a reference so playback code can explicitly fall back if needed.
+    youtube._shruti_original_get_stream_info = original_get_stream_info
 
     async def get_stream_info_with_shruti(
         video_id: str,
@@ -87,9 +101,7 @@ def install(youtube) -> None:
             stream_url = _build_url(video_id)
 
             if await _probe(stream_url):
-                logger.info(
-                    f"⚡ Shruti direct audio source ready: {video_id}"
-                )
+                logger.info("Shruti media response validated for track %s", video_id)
                 return {
                     "url": stream_url,
                     "headers": {},
@@ -97,8 +109,8 @@ def install(youtube) -> None:
                 }
 
             logger.warning(
-                f"⚠️ Shruti unavailable for {video_id}; "
-                "falling back to existing yt-dlp extractor."
+                "Shruti validation failed for track %s; using yt-dlp fallback.",
+                video_id,
             )
 
         return await original_get_stream_info(
@@ -108,7 +120,4 @@ def install(youtube) -> None:
         )
 
     youtube.get_stream_info = get_stream_info_with_shruti
-    logger.info(
-        "🎵 Shruti direct audio integration installed "
-        "with yt-dlp fallback."
-    )
+    logger.info("Shruti audio source installed with yt-dlp extraction fallback.")
