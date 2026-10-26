@@ -612,18 +612,36 @@ class TgCall(PyTgCalls):
         # Keep probing small so VC playback starts quickly while
         # retaining a large input buffer and reconnect support.
 
+        # HTTP reconnect flags are valid for network URLs, not local files.
+        # Shruti returns a downloaded local .m4a path, so only add these flags
+        # when FFmpeg is reading an HTTP(S) stream.
+        is_remote_stream = str(media.file_path).lower().startswith(
+            ("http://", "https://")
+        )
+
         ffmpeg_params = (
             (f"-ss {seek_time} " if seek_time > 1 else "")
             + "-probesize 1M "
             + "-analyzeduration 1M "
             + "-rtbufsize 20M "
             + "-thread_queue_size 4096 "
-            + "-reconnect 1 "
-            + "-reconnect_streamed 1 "
-            + "-reconnect_on_network_error 1 "
-            + "-reconnect_on_http_error 5xx "
-            + "-reconnect_delay_max 5 "
+            + (
+                "-reconnect 1 "
+                "-reconnect_streamed 1 "
+                "-reconnect_on_network_error 1 "
+                "-reconnect_on_http_error 5xx "
+                "-reconnect_delay_max 5 "
+                if is_remote_stream
+                else ""
+            )
             + "-fflags +genpts+igndts"
+        )
+
+        logger.info(
+            "Preparing %s audio input for track %s in chat %s",
+            "remote" if is_remote_stream else "local",
+            media.id,
+            chat_id,
         )
 
         # ==================================================
@@ -643,7 +661,7 @@ class TgCall(PyTgCalls):
         )
 
         # ==================================================
-        # Create direct network MediaStream
+        # Create MediaStream from a network URL or a local audio file
         # ==================================================
 
         stream = types.MediaStream(

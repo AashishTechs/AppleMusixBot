@@ -55,13 +55,24 @@ class Config:
         self.VIDEO_PLAY: bool = self._str_to_bool(getenv("VIDEO_PLAY", "True"))
         self.VIDEO_MAX_HEIGHT: int = self._parse_video_height()
 
-        # ArtistBots API
+        # ArtistBots API (existing fallback/legacy source)
         self.ARTISTBOTS_API_URL: str = getenv("ARTISTBOTS_API_URL", "")
         self.ARTISTBOTS_KEY: str = getenv("ARTISTBOTS_KEY", "")
         self.ENABLE_API: bool = self._str_to_bool(getenv("ENABLE_API", "True"))
         self.ENABLE_COOKIES_FALLBACK: bool = self._str_to_bool(getenv("ENABLE_COOKIES_FALLBACK", "True"))
         self.API_TIMEOUT: int = int(getenv("API_TIMEOUT", "60"))
         self.API_STREAM_TIMEOUT: int = int(getenv("API_STREAM_TIMEOUT", "300"))
+
+        # Shruti direct audio source
+        self.SHRUTI_API_URL: str = getenv(
+            "SHRUTI_API_URL",
+            "https://api01.shrutibots.site",
+        ).rstrip("/")
+        self.SHRUTI_API_KEY: str = getenv("SHRUTI_API_KEY", "")
+        self.ENABLE_SHRUTI_API: bool = self._str_to_bool(
+            getenv("ENABLE_SHRUTI_API", "False")
+        )
+        self.SHRUTI_TIMEOUT: int = int(getenv("SHRUTI_TIMEOUT", "10"))
 
         # YouTube Cookies
         self.COOKIES_URL: List[str] = self._parse_cookies()
@@ -136,6 +147,9 @@ class Config:
         
         if self.ENABLE_API and not self.ARTISTBOTS_KEY:
             print("Warning: ENABLE_API is True but ARTISTBOTS_KEY is not set")
+
+        if self.ENABLE_SHRUTI_API and not self.SHRUTI_API_KEY:
+            print("Warning: ENABLE_SHRUTI_API is True but SHRUTI_API_KEY is not set")
 
 
 config = Config()

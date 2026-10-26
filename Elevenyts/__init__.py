@@ -76,6 +76,11 @@ from Elevenyts.core.youtube import YouTube
 tg = Telegram()
 yt = YouTube()
 
+# Install the optional Shruti direct-audio source on the same YouTube object.
+# The installer preserves the existing yt-dlp extractor as an automatic fallback.
+from Elevenyts.core.shruti_patch import install as install_shruti
+install_shruti(yt)
+
 # Initialize preload manager for background track downloading
 from Elevenyts.core.preload import PreloadManager
 preload = PreloadManager()
