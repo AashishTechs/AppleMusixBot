@@ -19,6 +19,25 @@ from Elevenyts import config, logger
 _DOWNLOAD_DIR = Path("downloads") / "shruti"
 _MIN_AUDIO_BYTES = 16 * 1024
 _AUDIO_CONTENT_TYPES = ("audio/", "application/octet-stream", "binary/octet-stream")
+_AUDIO_EXTENSIONS = {
+    "audio/mp4": ".m4a",
+    "audio/x-m4a": ".m4a",
+    "audio/mpeg": ".mp3",
+    "audio/mp3": ".mp3",
+    "audio/aac": ".aac",
+    "audio/ogg": ".ogg",
+    "audio/opus": ".opus",
+    "audio/wav": ".wav",
+    "audio/x-wav": ".wav",
+    "audio/webm": ".webm",
+    "audio/flac": ".flac",
+}
+
+
+def _extension_for_content_type(content_type: str) -> str:
+    """Choose a filename extension matching the response's audio container."""
+    mime_type = content_type.split(";", 1)[0].strip().lower()
+    return _AUDIO_EXTENSIONS.get(mime_type, ".audio")
 
 
 async def _download_audio(video_id: str) -> str | None:
@@ -26,13 +45,15 @@ async def _download_audio(video_id: str) -> str | None:
     if not video_id or any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_" for char in video_id):
         return None
 
-    target = _DOWNLOAD_DIR / f"{video_id}.mp3"
+    # Shruti currently responds with audio/mp4. Reuse only the matching
+    # .m4a cache; don't mistake old MP4 bytes saved as .mp3 for real MP3.
+    cached_m4a = _DOWNLOAD_DIR / f"{video_id}.m4a"
     partial = _DOWNLOAD_DIR / f"{video_id}.{uuid.uuid4().hex}.part"
 
     try:
         _DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
-        if target.is_file() and target.stat().st_size >= _MIN_AUDIO_BYTES:
-            return str(target.resolve())
+        if cached_m4a.is_file() and cached_m4a.stat().st_size >= _MIN_AUDIO_BYTES:
+            return str(cached_m4a.resolve())
     except OSError:
         pass
 
@@ -46,6 +67,7 @@ async def _download_audio(video_id: str) -> str | None:
         "api_key": config.SHRUTI_API_KEY,
     }
     endpoint = f"{config.SHRUTI_API_URL.rstrip('/')}/download"
+    target: Path | None = None
 
     try:
         async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -68,6 +90,8 @@ async def _download_audio(video_id: str) -> str | None:
                     )
                     return None
 
+                extension = _extension_for_content_type(content_type)
+                target = _DOWNLOAD_DIR / f"{video_id}{extension}"
                 written = 0
                 with partial.open("wb") as output:
                     async for chunk in response.content.iter_chunked(128 * 1024):
@@ -84,7 +108,12 @@ async def _download_audio(video_id: str) -> str | None:
                     return None
 
         partial.replace(target)
-        logger.info("Shruti audio downloaded and validated for track %s (%s bytes).", video_id, written)
+        logger.info(
+            "Shruti audio downloaded for track %s (%s bytes, %s).",
+            video_id,
+            written,
+            target.suffix,
+        )
         return str(target.resolve())
 
     except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as exc:
