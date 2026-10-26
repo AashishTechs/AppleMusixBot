@@ -1,9 +1,10 @@
 """Shruti direct-audio integration.
 
 Shruti's documented /download endpoint returns the audio response itself rather
-than a short-lived media URL. Do not preflight it: probing makes an extra
-expensive request and can time out while the service prepares the audio. The
-streaming client should make the single request when playback starts.
+than a short-lived media URL. The endpoint has not passed a live health test,
+so keep it disabled by default until it reliably returns audio. The URL is
+handed directly to FFmpeg; HTTP errors after that point cannot be handled
+reliably by the URL-extraction fallback.
 """
 
 from __future__ import annotations
@@ -25,7 +26,12 @@ def _build_url(video_id: str) -> str:
 
 
 def install(youtube) -> None:
-    """Install Shruti as a first-choice audio source, retaining yt-dlp fallback."""
+    """Install optional Shruti source.
+
+yt-dlp is used when Shruti is disabled. This hook does not provide runtime
+fallback after FFmpeg opens a Shruti URL, so keep the feature disabled until
+the endpoint has been verified.
+"""
     original_get_stream_info = youtube.get_stream_info
     youtube._shruti_original_get_stream_info = original_get_stream_info
 
@@ -62,5 +68,6 @@ def install(youtube) -> None:
 
     youtube.get_stream_info = get_stream_info_with_shruti
     logger.info(
-        "Shruti audio source installed without a duplicate preflight request."
+        "Shruti audio source hook installed (enabled=%s).",
+        config.ENABLE_SHRUTI_API,
     )
