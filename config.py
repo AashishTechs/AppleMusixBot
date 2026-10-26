@@ -70,7 +70,7 @@ class Config:
         ).rstrip("/")
         self.SHRUTI_API_KEY: str = getenv("SHRUTI_API_KEY", "")
         self.ENABLE_SHRUTI_API: bool = self._str_to_bool(
-            getenv("ENABLE_SHRUTI_API", "True")
+            getenv("ENABLE_SHRUTI_API", "False")
         )
         self.SHRUTI_TIMEOUT: int = int(getenv("SHRUTI_TIMEOUT", "10"))
 
