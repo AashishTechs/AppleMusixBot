@@ -8,6 +8,7 @@ If the API fails, fall back to the existing YouTube extractor.
 from __future__ import annotations
 
 import asyncio
+import uuid
 from pathlib import Path
 
 import aiohttp
@@ -25,11 +26,11 @@ async def _download_audio(video_id: str) -> str | None:
     if not video_id or any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_" for char in video_id):
         return None
 
-    _DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
     target = _DOWNLOAD_DIR / f"{video_id}.mp3"
-    partial = _DOWNLOAD_DIR / f"{video_id}.mp3.part"
+    partial = _DOWNLOAD_DIR / f"{video_id}.{uuid.uuid4().hex}.part"
 
     try:
+        _DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
         if target.is_file() and target.stat().st_size >= _MIN_AUDIO_BYTES:
             return str(target.resolve())
     except OSError:
